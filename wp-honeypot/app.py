@@ -27,6 +27,7 @@ COMPOSE_CONFIG_NAMES = ('docker-compose.yml', 'docker-compose.yaml')
 SECRETS_CONFIG_NAMES = ('secrets.yaml', 'secrets.yml')
 ENV_EXAMPLE_NAMES = ('env.example',)
 PACKAGE_CONFIG_NAMES = ('package.json',)
+COMPOSER_CONFIG_NAMES = ('composer.json',)
 DEBUG_LOG_NAMES = ('debug.log',)
 SITE_ARCHIVE_NAMES = ('site.zip',)
 
@@ -118,7 +119,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + DEBUG_LOG_NAMES + SITE_ARCHIVE_NAMES):
+            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + COMPOSER_CONFIG_NAMES + DEBUG_LOG_NAMES + SITE_ARCHIVE_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -427,6 +428,13 @@ def response(method, path, event):
                 'description': 'WordPress site',
                 'scripts': {'start': 'node server.js'},
                 'dependencies': {'express': '^4.18.2'},
+            })
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in COMPOSER_CONFIG_NAMES:
+            mime = 'application/json; charset=utf-8'
+            content = json.dumps({
+                'name': 'wordpress-site', 'type': 'project',
+                'description': 'WordPress site',
+                'require': {'php': '>=7.4', 'wordpress/core': '6.4.2'},
             })
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES:
             mime = 'application/json; charset=utf-8'
