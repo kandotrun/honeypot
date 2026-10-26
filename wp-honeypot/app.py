@@ -369,6 +369,13 @@ def response(method, path, event):
                    '* General improvements and maintenance fixes.\n\n'
                    '= 2.2.0 - 2023-08-09 =\n'
                    '* Improved reliability and fixed minor display issues.\n')
+    elif kind == 'theme_probe' and path.rsplit('/', 1)[-1].lower() == 'readme.txt':
+        mime = 'text/plain; charset=utf-8'
+        content = ('=== ' + event['theme'].title() + ' ===\n'
+                   'Requires at least: 6.4\nTested up to: 6.4\nRequires PHP: 7.4\n'
+                   'Stable tag: 1.0.0\n'
+                   'License: GPLv2 or later\n\n'
+                   '== Description ==\nA WordPress theme.\n')
     elif kind == 'theme_probe' and path.endswith('style.css'):
         mime, content = 'text/css; charset=utf-8', '/* Theme Name: WordPress Theme\nVersion: 1.0.0\n*/\n'
     elif path == '/wp-includes/js/jquery/jquery.min.js' and method in ('GET', 'HEAD'):
