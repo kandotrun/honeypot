@@ -362,6 +362,18 @@ def response(method, path, event):
                    'window.jQuery = {version: "3.7.1"};\n')
     elif path == '/robots.txt' and method in ('GET', 'HEAD'):
         mime, content = 'text/plain; charset=utf-8', 'User-agent: *\nDisallow: /wp-admin/\nAllow: /wp-admin/admin-ajax.php\n'
+    elif path == '/readme.html' and method in ('GET', 'HEAD'):
+        content = ('<!doctype html><html><head><title>WordPress ReadMe</title>'
+                   '</head><body><h1>WordPress</h1><p>Version 6.4.2</p>'
+                   '<h2>Installation: Famous 5-minute install</h2>'
+                   '<p>Unpack the package, configure a database, and follow the '
+                   'installation wizard to set up your site.</p>'
+                   '<h2>System Requirements</h2><ul>'
+                   '<li>PHP version 7.4 or greater.</li>'
+                   '<li>MySQL version 5.7 or greater or MariaDB 10.4 or greater.</li>'
+                   '</ul><h2>License</h2>'
+                   '<p>WordPress is distributed under the GNU General Public License (GPL).</p>'
+                   '</body></html>')
     elif path == '/favicon.ico' and method in ('GET', 'HEAD'):
         mime = 'image/x-icon'
         # ICO container with one synthetic transparent 1x1 PNG.
