@@ -352,6 +352,14 @@ def response(method, path, event):
                        'mysqli, openssl, xml, zip</td></tr>'
                        '<tr><td>DOCUMENT_ROOT</td><td>/var/www/html</td></tr>'
                        '</table></body></html>')
+        elif (method in ('GET', 'HEAD') and lower.rsplit('/', 1)[-1] == 'test.php'
+              and 'phpinfo' not in lower):
+            content = ('<!doctype html><html><head><title>Test</title></head><body>'
+                       '<h1>Test</h1><table>'
+                       '<tr><th>PHP Version</th><td>8.1.2</td></tr>'
+                       '<tr><th>Server API</th><td>Apache 2.4.52 (Ubuntu)</td></tr>'
+                       '<tr><th>DOCUMENT_ROOT</th><td>/var/www/html</td></tr>'
+                       '</table></body></html>')
         else:
             status = 404
     return status, mime, headers, content.encode('utf-8')
