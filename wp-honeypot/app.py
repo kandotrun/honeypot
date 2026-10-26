@@ -30,6 +30,7 @@ PACKAGE_CONFIG_NAMES = ('package.json',)
 COMPOSER_CONFIG_NAMES = ('composer.json',)
 COMPOSER_LOCK_NAMES = ('composer.lock',)
 DEBUG_LOG_NAMES = ('debug.log',)
+ERROR_LOG_NAMES = ('error.log', 'php_error.log')
 SITE_ARCHIVE_NAMES = ('site.zip',)
 
 
@@ -120,7 +121,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + COMPOSER_CONFIG_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + SITE_ARCHIVE_NAMES):
+            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + COMPOSER_CONFIG_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + ERROR_LOG_NAMES + SITE_ARCHIVE_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -423,6 +424,13 @@ def response(method, path, event):
                 status = 404
         elif kind == 'exploit_probe' and 'wp-config.php' in lower:
             status = 403
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in ERROR_LOG_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('[12-Dec-2023 00:00:00 UTC] PHP Notice: Synthetic decoy server error log; PHP 8.1.2\n'
+                       '[12-Dec-2023 00:00:01 UTC] PHP Warning: Undefined array key "page" '
+                       'in /var/www/html/wp-content/plugins/example/hooks.php on line 24\n'
+                       '[12-Dec-2023 00:00:02 UTC] PHP Notice: Plugin hook called before initialization '
+                       'in /var/www/html/wp-includes/functions.php on line 100\n')
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in DEBUG_LOG_NAMES:
             mime = 'text/plain; charset=utf-8'
             content = ('[12-Dec-2023 00:00:00 UTC] PHP Notice: Synthetic decoy log; PHP 8.1.2\n'
