@@ -22,6 +22,7 @@ GENERATOR = '<meta name="generator" content="WordPress 6.4.2">'
 PLUGIN_STABLE_VERSION = '2.3.1'
 BODY_LOG_LIMIT = 16384
 XMLRPC_CREDENTIAL_LIMIT = 20
+CONFIG_BACKUP_NAMES = ('config.php.bak',)
 JSON_CONFIG_NAMES = ('settings.json', 'appsettings.json', 'config.json')
 COMPOSE_CONFIG_NAMES = ('docker-compose.yml', 'docker-compose.yaml')
 SECRETS_CONFIG_NAMES = ('secrets.yaml', 'secrets.yml')
@@ -121,7 +122,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + COMPOSER_CONFIG_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + ERROR_LOG_NAMES + SITE_ARCHIVE_NAMES):
+            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + COMPOSER_CONFIG_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + ERROR_LOG_NAMES + SITE_ARCHIVE_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -422,6 +423,13 @@ def response(method, path, event):
                 content = archive.getvalue()
             else:
                 status = 404
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('<?php\n// Synthetic decoy; no real credentials\n'
+                       "define('DB_HOST', 'localhost');\n"
+                       "define('DB_NAME', 'wordpress');\n"
+                       "define('DB_USER', 'wp_user');\n"
+                       "define('DB_PASSWORD', 'synthetic-decoy-password-not-real');\n")
         elif kind == 'exploit_probe' and 'wp-config.php' in lower:
             status = 403
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in ERROR_LOG_NAMES:
