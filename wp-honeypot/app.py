@@ -44,6 +44,7 @@ DEBUG_LOG_NAMES = ('debug.log',)
 SQL_DUMP_NAMES = ('dump.sql', 'backup.sql', 'db.sql', 'database.sql', 'mysql.sql')
 ERROR_LOG_NAMES = ('error.log', 'php_error.log', 'php_errors.log')
 LARAVEL_LOG_NAMES = ('laravel.log',)
+APP_LOG_NAMES = ('app.log',)
 SITE_ARCHIVE_NAMES = ('site.zip', 'backup.zip', 'www.zip')
 
 
@@ -134,7 +135,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or lower == '/.aws/credentials' or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + CONFIG_JS_NAMES + PARAMETERS_YML_NAMES + AWS_YML_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + COMPOSER_CONFIG_NAMES + CLIENT_SECRETS_NAMES + CREDENTIALS_CONFIG_NAMES + SECRETS_JSON_NAMES + CREDENTIALS_XML_NAMES + CREDENTIALS_INI_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + SQL_DUMP_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + SITE_ARCHIVE_NAMES):
+            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + CONFIG_JS_NAMES + PARAMETERS_YML_NAMES + AWS_YML_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + COMPOSER_CONFIG_NAMES + CLIENT_SECRETS_NAMES + CREDENTIALS_CONFIG_NAMES + SECRETS_JSON_NAMES + CREDENTIALS_XML_NAMES + CREDENTIALS_INI_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + SQL_DUMP_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + APP_LOG_NAMES + SITE_ARCHIVE_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -462,6 +463,11 @@ def response(method, path, event):
                        '[2023-12-12 00:00:01] production.NOTICE: Routine maintenance completed\n'
                        '[2023-12-12 00:00:02] production.WARNING: Deprecated application configuration option\n'
                        '[2023-12-12 00:00:03] production.ERROR: RuntimeException: Example operation unavailable\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in APP_LOG_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('[2023-12-12 00:00:00] INFO: Synthetic decoy application log; application started\n'
+                       '[2023-12-12 00:00:01] INFO: Routine request completed\n'
+                       '[2023-12-12 00:00:02] WARNING: Deprecated application option\n')
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in SQL_DUMP_NAMES:
             mime = 'application/sql; charset=utf-8'
             content = ('-- MySQL dump 10.13\n'
