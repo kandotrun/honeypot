@@ -24,6 +24,7 @@ JSON_CONFIG_NAMES = ('settings.json', 'appsettings.json', 'config.json')
 COMPOSE_CONFIG_NAMES = ('docker-compose.yml', 'docker-compose.yaml')
 ENV_EXAMPLE_NAMES = ('env.example',)
 PACKAGE_CONFIG_NAMES = ('package.json',)
+DEBUG_LOG_NAMES = ('debug.log',)
 
 
 
@@ -113,7 +114,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES):
+            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + DEBUG_LOG_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -367,6 +368,16 @@ def response(method, path, event):
         lower = urllib.parse.unquote(path).lower()
         if kind == 'exploit_probe' and 'wp-config.php' in lower:
             status = 403
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in DEBUG_LOG_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('[12-Dec-2023 00:00:00 UTC] PHP Notice: Synthetic decoy log; PHP 8.1.2\n'
+                       '[12-Dec-2023 00:00:01 UTC] PHP Warning: Undefined variable $hook_name '
+                       'in /var/www/html/wp-content/plugins/example/hooks.php on line 24\n'
+                       '[12-Dec-2023 00:00:02 UTC] PHP Notice: Plugin hook called before initialization '
+                       'in /var/www/html/wp-includes/functions.php on line 100\n'
+                       '[12-Dec-2023 00:00:03 UTC] WordPress database error: '
+                       'You have an error in your SQL syntax for query SELECT '
+                       'made by /var/www/html/wp-content/plugins/example/hooks.php\n')
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in ENV_EXAMPLE_NAMES:
             mime = 'text/plain; charset=utf-8'
             content = ('# Synthetic decoy example configuration; no real credentials\n'
