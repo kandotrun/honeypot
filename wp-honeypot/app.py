@@ -32,6 +32,7 @@ CONFIG_JS_NAMES = ('config.js',)
 PARAMETERS_YML_NAMES = ('parameters.yml',)
 AWS_YML_NAMES = ('aws.yml',)
 DATABASE_YML_NAMES = ('database.yml',)
+APPLICATION_YML_NAMES = ('application.yml',)
 ENV_EXAMPLE_NAMES = ('env.example',)
 PACKAGE_CONFIG_NAMES = ('package.json',)
 PACKAGE_LOCK_NAMES = ('package-lock.json',)
@@ -137,7 +138,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or lower in ('/.aws/credentials', '/.aws/config') or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + CONFIG_JS_NAMES + PARAMETERS_YML_NAMES + AWS_YML_NAMES + DATABASE_YML_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + PACKAGE_LOCK_NAMES + COMPOSER_CONFIG_NAMES + CLIENT_SECRETS_NAMES + CREDENTIALS_CONFIG_NAMES + SECRETS_JSON_NAMES + CREDENTIALS_XML_NAMES + CREDENTIALS_INI_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + SQL_DUMP_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + APP_LOG_NAMES + SITE_ARCHIVE_NAMES):
+            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + CONFIG_JS_NAMES + PARAMETERS_YML_NAMES + AWS_YML_NAMES + DATABASE_YML_NAMES + APPLICATION_YML_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + PACKAGE_LOCK_NAMES + COMPOSER_CONFIG_NAMES + CLIENT_SECRETS_NAMES + CREDENTIALS_CONFIG_NAMES + SECRETS_JSON_NAMES + CREDENTIALS_XML_NAMES + CREDENTIALS_INI_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + SQL_DUMP_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + APP_LOG_NAMES + SITE_ARCHIVE_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -698,6 +699,17 @@ def response(method, path, event):
                        '  username: wp_user\n'
                        '  host: localhost\n'
                        '  password: synthetic-decoy-password-not-real\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in APPLICATION_YML_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('# Synthetic decoy Spring Boot configuration; no real credentials\n'
+                       'spring:\n'
+                       '  datasource:\n'
+                       '    url: jdbc:mysql://localhost:3306/wordpress\n'
+                       '    username: wp_user\n'
+                       '    password: synthetic-decoy-password-not-real\n'
+                       'server:\n'
+                       '  port: 8080\n'
+                       'api_key: synthetic-decoy-api-key-not-real\n')
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in CONFIG_INI_NAMES:
             mime = 'text/plain; charset=utf-8'
             content = ('[app]\n'
