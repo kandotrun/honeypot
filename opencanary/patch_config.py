@@ -33,6 +33,9 @@ for name in ("ssh", "telnet", "snmp", "ntp", "tftp", "git", "rdp", "smb"):
     if f"{name}.enabled" in cfg:
         cfg[f"{name}.enabled"] = False
 cfg["portscan.enabled"] = False
+# 80/443 are handed over to the WordPress honeypot (2026-10-26).
+cfg["http.enabled"] = False
+cfg["https.enabled"] = False
 
 # Logging: the stock file handler is dictConfig-style (filename and
 # friends live at the handler's top level). Swap in the rotating
