@@ -43,7 +43,7 @@ DEBUG_LOG_NAMES = ('debug.log',)
 SQL_DUMP_NAMES = ('dump.sql', 'backup.sql', 'db.sql', 'database.sql', 'mysql.sql')
 ERROR_LOG_NAMES = ('error.log', 'php_error.log')
 LARAVEL_LOG_NAMES = ('laravel.log',)
-SITE_ARCHIVE_NAMES = ('site.zip',)
+SITE_ARCHIVE_NAMES = ('site.zip', 'backup.zip', 'www.zip')
 
 
 
