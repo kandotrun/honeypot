@@ -28,6 +28,7 @@ COMPOSE_CONFIG_NAMES = ('docker-compose.yml', 'docker-compose.yaml')
 SECRETS_CONFIG_NAMES = ('secrets.yaml', 'secrets.yml')
 CONFIG_YAML_NAMES = ('.config.yaml',)
 CONFIG_INI_NAMES = ('config.ini',)
+CONFIG_JS_NAMES = ('config.js',)
 ENV_EXAMPLE_NAMES = ('env.example',)
 PACKAGE_CONFIG_NAMES = ('package.json',)
 COMPOSER_CONFIG_NAMES = ('composer.json',)
@@ -125,7 +126,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + COMPOSER_CONFIG_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + SITE_ARCHIVE_NAMES):
+            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + CONFIG_JS_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + COMPOSER_CONFIG_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + SITE_ARCHIVE_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -547,6 +548,16 @@ def response(method, path, event):
                        'name=wordpress\n'
                        'username=wp_user\n'
                        'password=synthetic-decoy-password-not-real\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in CONFIG_JS_NAMES:
+            mime = 'application/javascript'
+            content = ('// Synthetic decoy configuration; no real credentials\n'
+                       'const config = {\n'
+                       "  apiUrl: 'http://localhost',\n"
+                       "  database: {host: 'localhost', name: 'wordpress', user: 'wp_user',\n"
+                       "    password: 'synthetic-decoy-password-not-real'},\n"
+                       "  apiKey: 'synthetic-decoy-api-key-not-real',\n"
+                       "  sessionSecret: 'synthetic-decoy-session-secret-not-real'\n"
+                       '};\n')
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in COMPOSE_CONFIG_NAMES:
             mime = 'text/plain; charset=utf-8'
             content = ('# Synthetic decoy configuration; no real credentials\n'
