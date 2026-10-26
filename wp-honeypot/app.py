@@ -20,6 +20,7 @@ BODY_LOG_LIMIT = 16384
 XMLRPC_CREDENTIAL_LIMIT = 20
 JSON_CONFIG_NAMES = ('settings.json', 'appsettings.json', 'config.json')
 COMPOSE_CONFIG_NAMES = ('docker-compose.yml', 'docker-compose.yaml')
+ENV_EXAMPLE_NAMES = ('env.example',)
 
 
 
@@ -109,7 +110,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES):
+            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + ENV_EXAMPLE_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -297,6 +298,15 @@ def response(method, path, event):
         lower = urllib.parse.unquote(path).lower()
         if kind == 'exploit_probe' and 'wp-config.php' in lower:
             status = 403
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in ENV_EXAMPLE_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('# Synthetic decoy example configuration; no real credentials\n'
+                       'APP_ENV=production\nAPP_DEBUG=false\n'
+                       'DB_HOST=localhost\nDB_DATABASE=wordpress\nDB_USERNAME=wp_user\n'
+                       'DB_PASSWORD=synthetic-decoy-password-not-real\n'
+                       'APP_KEY=synthetic-decoy-app-key-not-real\n'
+                       'API_KEY=synthetic-decoy-api-key-not-real\n'
+                       'CACHE_DRIVER=file\nSESSION_DRIVER=file\n')
         elif kind == 'exploit_probe' and '.env' in lower:
             mime = 'text/plain; charset=utf-8'
             content = ('# Synthetic decoy configuration; no real credentials\n'
