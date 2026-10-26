@@ -125,6 +125,24 @@ def classify(method, path, query, headers, body):
                 'password': fields.get('pwd', [''])[0]}
     if path == '/xmlrpc.php' and method == 'POST':
         return {'event': 'xmlrpc', **xml_credentials(body), **xmlrpc_metadata(body)}
+    if method == 'POST' and (
+            path in ('/wp-json/batch/v1', '/wp-json/batch/v1/',
+                     '/index.php/wp-json/batch/v1', '/index.php/wp-json/batch/v1/')
+            or (path in ('/', '/index.php') and (
+                any(value.strip('/') == 'batch/v1' for value in
+                    urllib.parse.parse_qs(query).get('rest_route', []))
+                or ('rest_route' in body and '/batch/v1' in body)))):
+        # Inspect counts only; subrequest URLs and credentials are never used.
+        try:
+            data = json.loads(body)
+        except (ValueError, RecursionError):
+            data = None
+        if isinstance(data, dict) and isinstance(data.get('requests'), list):
+            count = len(data['requests'])
+        else:
+            indices = set(re.findall(r'requests\[(\d+)\]', urllib.parse.unquote_plus(body)))
+            count = len(indices) if indices else 1
+        return {'event': 'rest_batch', 'batch_count': min(count, 20)}
     if path == '/wp-admin' or path.startswith('/wp-admin/'):
         return {'event': 'admin_probe'}
     for kind in ('plugin', 'theme'):
@@ -237,6 +255,24 @@ def response(method, path, event):
                        'faultString': 'Incorrect username or password.'}
                       for _ in range(event.get('xmlrpc_multicall_count', 1))]
             content = xmlrpc_dumps((faults,), methodresponse=True)
+    elif kind == 'rest_batch':
+        mime = 'application/json; charset=utf-8'
+        count = event['batch_count']
+        if count == 0:
+            status = 400
+            data = {'code': 'rest_batch_not_request',
+                    'message': 'No batch requests were provided.',
+                    'data': {'status': 400}}
+        else:
+            status = 207
+            data = {'responses': [
+                {'body': {'code': 'rest_forbidden_context',
+                          'message': 'Sorry, you are not allowed to do that.',
+                          'data': {'status': 401}},
+                 'status': 401,
+                 'headers': {'Content-Type': 'application/json; charset=UTF-8'}}
+                for _ in range(count)]}
+        content = json.dumps(data)
     elif kind in ('rest_index', 'rest_users', 'rest_posts', 'rest_pages', 'rest_types',
                   'rest_categories', 'rest_comments', 'rest_forbidden'):
         mime = 'application/json; charset=utf-8'
