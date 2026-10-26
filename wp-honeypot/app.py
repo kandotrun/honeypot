@@ -360,6 +360,18 @@ def response(method, path, event):
                        '<tr><th>Server API</th><td>Apache 2.4.52 (Ubuntu)</td></tr>'
                        '<tr><th>DOCUMENT_ROOT</th><td>/var/www/html</td></tr>'
                        '</table></body></html>')
+        elif method in ('GET', 'HEAD') and lower.rsplit('/', 1)[-1] == 'server.js':
+            mime = 'application/javascript'
+            content = ('// Synthetic decoy configuration; no real credentials\n'
+                       "const express = require('express');\n"
+                       'const app = express();\n'
+                       'const config = {\n'
+                       "  database: {host: 'localhost', database: 'wordpress', user: 'wp_user',\n"
+                       "    password: 'synthetic-decoy-password-not-real'},\n"
+                       "  sessionSecret: 'synthetic-decoy-session-secret-not-real'\n"
+                       '};\n'
+                       "app.get('/', (req, res) => res.send('Hello World!'));\n"
+                       'app.listen(3000);\n')
         else:
             status = 404
     return status, mime, headers, content.encode('utf-8')
