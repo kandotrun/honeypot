@@ -3,6 +3,7 @@
 import base64
 import datetime as dt
 import html
+import io
 import json
 import os
 import re
@@ -12,6 +13,7 @@ import sys
 import threading
 import urllib.parse
 import xml.etree.ElementTree as ET
+import zipfile
 from xmlrpc.client import dumps as xmlrpc_dumps
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -26,6 +28,7 @@ SECRETS_CONFIG_NAMES = ('secrets.yaml', 'secrets.yml')
 ENV_EXAMPLE_NAMES = ('env.example',)
 PACKAGE_CONFIG_NAMES = ('package.json',)
 DEBUG_LOG_NAMES = ('debug.log',)
+SITE_ARCHIVE_NAMES = ('site.zip',)
 
 
 
@@ -115,7 +118,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + DEBUG_LOG_NAMES):
+            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + DEBUG_LOG_NAMES + SITE_ARCHIVE_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -367,7 +370,27 @@ def response(method, path, event):
                    + png)
     else:
         lower = urllib.parse.unquote(path).lower()
-        if kind == 'exploit_probe' and 'wp-config.php' in lower:
+        if kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in SITE_ARCHIVE_NAMES:
+            if method in ('GET', 'HEAD'):
+                mime = 'application/zip'
+                entries = (
+                    ('index.html', '<!-- Synthetic decoy -->\n'
+                     '<h2>Hello world!</h2><p>Welcome to WordPress.</p>\n'),
+                    ('wp-config.php', '<?php\n// Synthetic decoy; no real credentials\n'
+                     "define('DB_HOST', 'localhost');\n"
+                     "define('DB_NAME', 'wordpress');\n"
+                     "define('DB_USER', 'wp_user');\n"
+                     "define('DB_PASSWORD', 'synthetic-decoy-password-not-real');\n"),
+                )
+                archive = io.BytesIO()
+                with zipfile.ZipFile(archive, 'w') as zipped:
+                    for name, data in entries:
+                        info = zipfile.ZipInfo(name, date_time=(2023, 12, 12, 0, 0, 0))
+                        zipped.writestr(info, data.encode('utf-8'))
+                content = archive.getvalue()
+            else:
+                status = 404
+        elif kind == 'exploit_probe' and 'wp-config.php' in lower:
             status = 403
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in DEBUG_LOG_NAMES:
             mime = 'text/plain; charset=utf-8'
