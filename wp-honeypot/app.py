@@ -19,6 +19,7 @@ PLUGIN_STABLE_VERSION = '2.3.1'
 BODY_LOG_LIMIT = 16384
 XMLRPC_CREDENTIAL_LIMIT = 20
 JSON_CONFIG_NAMES = ('settings.json', 'appsettings.json', 'config.json')
+COMPOSE_CONFIG_NAMES = ('docker-compose.yml', 'docker-compose.yaml')
 
 
 
@@ -108,7 +109,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES):
+            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -314,6 +315,30 @@ def response(method, path, event):
                              'password': 'synthetic-decoy-password-not-real'},
                 'api': {'key': 'synthetic-decoy-api-key-not-real'},
             })
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in COMPOSE_CONFIG_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('# Synthetic decoy configuration; no real credentials\n'
+                       'services:\n'
+                       '  wordpress:\n'
+                       '    image: wordpress:6.4.2-apache\n'
+                       '    ports:\n'
+                       '      - "80:80"\n'
+                       '    environment:\n'
+                       '      WORDPRESS_DB_HOST: db\n'
+                       '      WORDPRESS_DB_NAME: wordpress\n'
+                       '      WORDPRESS_DB_USER: wp_user\n'
+                       '      WORDPRESS_DB_PASSWORD: synthetic-decoy-password-not-real\n'
+                       '  db:\n'
+                       '    image: mysql:8.0\n'
+                       '    environment:\n'
+                       '      MYSQL_DATABASE: wordpress\n'
+                       '      MYSQL_USER: wp_user\n'
+                       '      MYSQL_PASSWORD: synthetic-decoy-password-not-real\n'
+                       '      MYSQL_ROOT_PASSWORD: synthetic-decoy-root-password-not-real\n'
+                       '    volumes:\n'
+                       '      - db_data:/var/lib/mysql\n'
+                       'volumes:\n'
+                       '  db_data:\n')
         elif (method in ('GET', 'HEAD') and lower.rsplit('/', 1)[-1] == 'info.php'
               and 'phpinfo' not in lower):
             content = ('<!doctype html><html><head><title>phpinfo()</title>'
