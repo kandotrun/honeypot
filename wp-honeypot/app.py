@@ -150,6 +150,11 @@ def classify(method, path, query, headers, body):
         if match:
             return {'event': kind + '_probe', kind: match.group(1)}
     if method in ('GET', 'HEAD'):
+        if path in ('/feed', '/feed/', '/feed/rss2', '/feed/rss2/',
+                    '/feed/rss', '/feed/rss/', '/comments/feed', '/comments/feed/') or (
+                path in ('/', '/index.php') and any(value in ('rss2', 'rss')
+                    for value in urllib.parse.parse_qs(query).get('feed', []))):
+            return {'event': 'feed'}
         routes = {'/': 'page_home', '/wp-login.php': 'page_login',
                   '/xmlrpc.php': 'page_xmlrpc', '/wp-json': 'rest_index',
                   '/wp-json/': 'rest_index', '/wp-json/wp/v2/users': 'rest_users',
@@ -210,6 +215,23 @@ def response(method, path, event):
     if kind == 'page_home':
         content = page('<article><h2>Hello world!</h2><p>Welcome to WordPress.</p></article>'
                        '<article><h2>A beautiful autumn morning</h2></article>')
+    elif kind == 'feed':
+        mime = 'application/rss+xml; charset=utf-8'
+        content = ('<?xml version="1.0" encoding="UTF-8"?>'
+                   '<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">'
+                   '<channel><title>My WordPress Blog</title>'
+                   '<link>http://localhost</link>'
+                   '<description>Just another WordPress site</description>'
+                   '<language>en-US</language>'
+                   '<generator>https://wordpress.org/?v=6.4.2</generator>'
+                   '<lastBuildDate>Tue, 12 Dec 2023 00:00:00 +0000</lastBuildDate>'
+                   '<item><title>Hello world!</title>'
+                   '<link>http://localhost/?p=1</link>'
+                   '<guid>http://localhost/?p=1</guid>'
+                   '<pubDate>Tue, 12 Dec 2023 00:00:00 +0000</pubDate>'
+                   '<dc:creator>admin</dc:creator><category>Uncategorized</category>'
+                   '<description>Welcome to WordPress.</description>'
+                   '</item></channel></rss>')
     elif kind == 'author_probe':
         if path == '/':
             status, headers['Location'], content = 302, '/author/admin/', ''
