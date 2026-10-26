@@ -374,6 +374,21 @@ def response(method, path, event):
                    '</ul><h2>License</h2>'
                    '<p>WordPress is distributed under the GNU General Public License (GPL).</p>'
                    '</body></html>')
+    elif path == '/license.txt' and method in ('GET', 'HEAD'):
+        mime = 'text/plain; charset=utf-8'
+        content = ('WordPress - Web publishing software\n'
+                   '\n'
+                   'Copyright WordPress contributors.\n'
+                   '\n'
+                   'WordPress is free software: you can redistribute it and/or modify\n'
+                   'it under the terms of the GNU General Public License (GPL),\n'
+                   'version 2 or, at your option, any later version.\n'
+                   '\n'
+                   'WordPress is distributed in the hope that it will be useful,\n'
+                   'but WITHOUT ANY WARRANTY; without even the implied warranty of\n'
+                   'MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n'
+                   '\n'
+                   'See the GNU General Public License for more details.\n')
     elif path == '/favicon.ico' and method in ('GET', 'HEAD'):
         mime = 'image/x-icon'
         # ICO container with one synthetic transparent 1x1 PNG.
