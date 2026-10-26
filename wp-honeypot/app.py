@@ -133,7 +133,7 @@ def xml_credentials(body):
 def classify(method, path, query, headers, body):
     lower = urllib.parse.unquote(path).lower()
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
-                                'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or lower == '/.aws/credentials' or (
+                                'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or lower in ('/.aws/credentials', '/.aws/config') or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
             lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + CONFIG_JS_NAMES + PARAMETERS_YML_NAMES + AWS_YML_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + COMPOSER_CONFIG_NAMES + CLIENT_SECRETS_NAMES + CREDENTIALS_CONFIG_NAMES + SECRETS_JSON_NAMES + CREDENTIALS_XML_NAMES + CREDENTIALS_INI_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + SQL_DUMP_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + APP_LOG_NAMES + SITE_ARCHIVE_NAMES):
         return {'event': 'exploit_probe'}
@@ -591,6 +591,11 @@ def response(method, path, event):
                        '[credentials]\n'
                        'api_key=synthetic-decoy-api-key-not-real\n'
                        'secret_key=synthetic-decoy-secret-key-not-real\n')
+        elif kind == 'exploit_probe' and lower == '/.aws/config':
+            mime = 'text/plain; charset=utf-8'
+            content = ('[default]\n'
+                       'region = us-east-1\n'
+                       'output = json\n')
         elif kind == 'exploit_probe' and lower == '/.aws/credentials':
             mime = 'text/plain; charset=utf-8'
             content = ('[default]\n'
