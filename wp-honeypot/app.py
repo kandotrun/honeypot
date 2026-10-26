@@ -23,6 +23,7 @@ XMLRPC_CREDENTIAL_LIMIT = 20
 JSON_CONFIG_NAMES = ('settings.json', 'appsettings.json', 'config.json')
 COMPOSE_CONFIG_NAMES = ('docker-compose.yml', 'docker-compose.yaml')
 ENV_EXAMPLE_NAMES = ('env.example',)
+PACKAGE_CONFIG_NAMES = ('package.json',)
 
 
 
@@ -112,7 +113,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + ENV_EXAMPLE_NAMES):
+            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -326,6 +327,14 @@ def response(method, path, event):
                        'APP_KEY=synthetic-decoy-app-key-not-real\n'
                        'API_KEY=synthetic-decoy-api-key-not-real\n'
                        'CACHE_DRIVER=file\nSESSION_DRIVER=file\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in PACKAGE_CONFIG_NAMES:
+            mime = 'application/json; charset=utf-8'
+            content = json.dumps({
+                'name': 'wordpress-site', 'version': '1.0.0', 'private': True,
+                'description': 'WordPress site',
+                'scripts': {'start': 'node server.js'},
+                'dependencies': {'express': '^4.18.2'},
+            })
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES:
             mime = 'application/json; charset=utf-8'
             content = json.dumps({
