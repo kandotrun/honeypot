@@ -389,6 +389,8 @@ def response(method, path, event):
                    'MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n'
                    '\n'
                    'See the GNU General Public License for more details.\n')
+    elif path == '/wp-cron.php' and method in ('GET', 'HEAD'):
+        content = ''
     elif path == '/favicon.ico' and method in ('GET', 'HEAD'):
         mime = 'image/x-icon'
         # ICO container with one synthetic transparent 1x1 PNG.
