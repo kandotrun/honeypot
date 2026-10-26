@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Inert WordPress decoy; all captured input stays in the JSONL log."""
+import base64
 import datetime as dt
 import html
 import json
 import os
 import re
 import ssl
+import struct
 import sys
 import threading
 import urllib.parse
@@ -294,6 +296,14 @@ def response(method, path, event):
                    'window.jQuery = {version: "3.7.1"};\n')
     elif path == '/robots.txt' and method in ('GET', 'HEAD'):
         mime, content = 'text/plain; charset=utf-8', 'User-agent: *\nDisallow: /wp-admin/\nAllow: /wp-admin/admin-ajax.php\n'
+    elif path == '/favicon.ico' and method in ('GET', 'HEAD'):
+        mime = 'image/x-icon'
+        # ICO container with one synthetic transparent 1x1 PNG.
+        png = base64.b64decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=')
+        content = (struct.pack('<HHH', 0, 1, 1)
+                   + struct.pack('<BBBBHHII', 1, 1, 0, 0, 1, 32, len(png), 22)
+                   + png)
     else:
         lower = urllib.parse.unquote(path).lower()
         if kind == 'exploit_probe' and 'wp-config.php' in lower:
@@ -384,7 +394,7 @@ def response(method, path, event):
                        'app.listen(3000);\n')
         else:
             status = 404
-    return status, mime, headers, content.encode('utf-8')
+    return status, mime, headers, content if isinstance(content, bytes) else content.encode('utf-8')
 
 
 class Handler(BaseHTTPRequestHandler):
