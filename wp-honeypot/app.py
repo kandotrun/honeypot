@@ -36,6 +36,7 @@ PACKAGE_CONFIG_NAMES = ('package.json',)
 COMPOSER_CONFIG_NAMES = ('composer.json',)
 CLIENT_SECRETS_NAMES = ('client_secrets.json',)
 CREDENTIALS_CONFIG_NAMES = ('credentials.json',)
+CREDENTIALS_XML_NAMES = ('credentials.xml',)
 COMPOSER_LOCK_NAMES = ('composer.lock',)
 DEBUG_LOG_NAMES = ('debug.log',)
 ERROR_LOG_NAMES = ('error.log', 'php_error.log')
@@ -130,7 +131,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + CONFIG_JS_NAMES + PARAMETERS_YML_NAMES + AWS_YML_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + COMPOSER_CONFIG_NAMES + CLIENT_SECRETS_NAMES + CREDENTIALS_CONFIG_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + SITE_ARCHIVE_NAMES):
+            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + CONFIG_JS_NAMES + PARAMETERS_YML_NAMES + AWS_YML_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + COMPOSER_CONFIG_NAMES + CLIENT_SECRETS_NAMES + CREDENTIALS_CONFIG_NAMES + CREDENTIALS_XML_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + SITE_ARCHIVE_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -515,6 +516,15 @@ def response(method, path, event):
                 'api_key': 'synthetic-decoy-api-key-not-real',
                 'secret_key': 'synthetic-decoy-secret-key-not-real',
             })
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in CREDENTIALS_XML_NAMES:
+            mime = 'application/xml; charset=utf-8'
+            content = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+                       '<credentials><database><host>localhost</host>'
+                       '<name>wordpress</name><user>wp_user</user>'
+                       '<password>synthetic-decoy-password-not-real</password>'
+                       '</database><api_key>synthetic-decoy-api-key-not-real</api_key>'
+                       '<secret_key>synthetic-decoy-secret-key-not-real</secret_key>'
+                       '</credentials>\n')
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in COMPOSER_LOCK_NAMES:
             mime = 'application/json; charset=utf-8'
             content = json.dumps({
