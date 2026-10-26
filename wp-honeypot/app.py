@@ -373,6 +373,11 @@ def response(method, path, event):
                    'window.jQuery = {version: "3.7.1"};\n')
     elif path == '/robots.txt' and method in ('GET', 'HEAD'):
         mime, content = 'text/plain; charset=utf-8', 'User-agent: *\nDisallow: /wp-admin/\nAllow: /wp-admin/admin-ajax.php\n'
+    elif path in ('/.well-known/security.txt', '/security.txt') and method in ('GET', 'HEAD'):
+        mime = 'text/plain; charset=utf-8'
+        content = ('Contact: mailto:security@example.com\n'
+                   'Expires: 2024-12-31T00:00:00Z\n'
+                   'Preferred-Languages: en\n')
     elif path == '/readme.html' and method in ('GET', 'HEAD'):
         content = ('<!doctype html><html><head><title>WordPress ReadMe</title>'
                    '</head><body><h1>WordPress</h1><p>Version 6.4.2</p>'
