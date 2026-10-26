@@ -42,7 +42,7 @@ CREDENTIALS_INI_NAMES = ('credentials.ini',)
 COMPOSER_LOCK_NAMES = ('composer.lock',)
 DEBUG_LOG_NAMES = ('debug.log',)
 SQL_DUMP_NAMES = ('dump.sql', 'backup.sql', 'db.sql', 'database.sql', 'mysql.sql')
-ERROR_LOG_NAMES = ('error.log', 'php_error.log')
+ERROR_LOG_NAMES = ('error.log', 'php_error.log', 'php_errors.log')
 LARAVEL_LOG_NAMES = ('laravel.log',)
 SITE_ARCHIVE_NAMES = ('site.zip', 'backup.zip', 'www.zip')
 
