@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🍯 Honeypot Live</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 20px 24px; background: #0b0e14; color: #e6e6e6;
+         font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; }
+  h1 { font-size: 26px; margin: 0 0 2px; }
+  .sub { color: #8a93a5; font-size: 13px; margin-bottom: 18px; }
+  .cards { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+  .card { background: #141926; border: 1px solid #232b3d; border-radius: 12px;
+          padding: 14px 18px; min-width: 150px; }
+  .card .num { font-size: 38px; font-weight: 700; line-height: 1.1; }
+  .card .lbl { color: #8a93a5; font-size: 13px; margin-top: 2px; }
+  .card.alert .num { color: #ffb454; }
+  .cols { display: flex; gap: 18px; flex-wrap: wrap; }
+  .col { flex: 1 1 300px; background: #11151f; border: 1px solid #1e2534;
+         border-radius: 12px; padding: 14px 16px; }
+  .col h2 { font-size: 15px; margin: 0 0 10px; color: #aeb8cc; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { padding: 3px 4px; border-bottom: 1px solid #1a2130; word-break: break-all; }
+  td.n { text-align: right; color: #8a93a5; width: 40px; }
+  .feed { font-size: 13.5px; }
+  .feed div { padding: 5px 2px; border-bottom: 1px solid #1a2130; }
+  .feed .t { color: #66707f; font-size: 12px; margin-right: 8px; }
+  .feed .src { color: #7fd4ff; }
+  .feed .geo { color: #9fb4d8; font-size: 12px; }
+  .feed .warn { color: #ffb454; font-weight: 600; }
+  #spark { width: 100%; height: 64px; display: block; }
+  #globe { width: 100%; height: auto; display: block; }
+  .live { color: #6fe08a; }
+</style>
+</head>
+<body>
+<h1>🍯 Honeypot Live <span class="live" id="dot">●</span></h1>
+<div class="sub">さくらVPS ハニーポット（Cowrie + OpenCanary）／ 標的: 石狩（さくらVPS）<span id="gen"></span></div>
+
+<div class="cards">
+  <div class="card"><div class="num" id="c_sess">-</div><div class="lbl">Cowrie 今日のセッション</div></div>
+  <div class="card"><div class="num" id="c_1h">-</div><div class="lbl">直近1時間</div></div>
+  <div class="card alert"><div class="num" id="c_active">-</div><div class="lbl">接続中のセッション</div></div>
+  <div class="card"><div class="num" id="c_login">-</div><div class="lbl">今日のログイン成功</div></div>
+  <div class="card"><div class="num" id="k_ev">-</div><div class="lbl">OpenCanary 今日のイベント</div></div>
+</div>
+
+<div class="col" style="margin-bottom:18px">
+  <h2>🌐 攻撃マップ — 世界から石狩へ</h2>
+  <canvas id="globe" width="980" height="460"></canvas>
+</div>
+
+<div class="col" style="margin-bottom:18px">
+  <h2>直近60分の攻撃ペース（1分ごと）</h2>
+  <svg id="spark" preserveAspectRatio="none"></svg>
+</div>
+
+<div class="cols">
+  <div class="col"><h2>ライブフィード</h2><div class="feed" id="feed"></div></div>
+  <div class="col">
+    <h2>攻撃元 TOP（今日・国/都市）</h2><table id="ips"></table>
+    <h2 style="margin-top:16px">試された認証情報 TOP</h2><table id="creds"></table>
+    <h2 style="margin-top:16px">実行コマンド TOP</h2><table id="cmds"></table>
+    <h2 style="margin-top:16px">OpenCanary ポート別</h2><table id="ports"></table>
+  </div>
+</div>
+
+<script>
+let ATTACKERS = [];
+let TARGET = { name: "石狩", lat: 43.17, lon: 141.31 };
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function flag(cc) {
+  if (!cc || cc.length !== 2) return "";
+  return String.fromCodePoint(...[...cc.toUpperCase()].map(c => 127397 + c.charCodeAt(0)));
+}
+function rows(el, pairs) {
+  el.innerHTML = (pairs || []).map(p =>
+    `<tr><td>${escapeHtml(String(p[0]))}</td><td class="n">${p[1]}</td></tr>`).join("");
+}
+function drawSpark(data) {
+  const svg = document.getElementById("spark");
+  const w = svg.clientWidth || 800, h = 64, max = Math.max(...data, 1);
+  const step = w / (data.length - 1);
+  const pts = data.map((v, i) => `${(i * step).toFixed(1)},${(h - 4 - (v / max) * (h - 10)).toFixed(1)}`).join(" ");
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.innerHTML = `<polyline points="${pts}" fill="none" stroke="#ffb454" stroke-width="2"/>`;
+}
+
+/* ---- orthographic globe with attack arcs ---- */
+const cv = document.getElementById("globe");
+const ctx = cv.getContext("2d");
+const CX = cv.width / 2, CY = cv.height / 2, R = 200;
+const TILT = -0.42;
+let rot = 2.2;
+
+function llToVec(lat, lon) {
+  const la = lat * Math.PI / 180, lo = lon * Math.PI / 180;
+  return [Math.cos(la) * Math.sin(lo), Math.sin(la), Math.cos(la) * Math.cos(lo)];
+}
+function rotate(v) {
+  const [x, y, z] = v;
+  const cr = Math.cos(rot), sr = Math.sin(rot);
+  const x1 = x * cr + z * sr, z1 = -x * sr + z * cr;
+  const ct = Math.cos(TILT), st = Math.sin(TILT);
+  const y2 = y * ct - z1 * st, z2 = y * st + z1 * ct;
+  return [x1, y2, z2];
+}
+function project(v) {
+  const [x, y, z] = rotate(v);
+  return { x: CX + R * x, y: CY - R * y, z };
+}
+function slerp(a, b, t) {
+  const dot = Math.min(1, Math.max(-1, a[0]*b[0] + a[1]*b[1] + a[2]*b[2]));
+  const th = Math.acos(dot);
+  if (th < 1e-5) return a;
+  const s = Math.sin(th);
+  const f1 = Math.sin((1 - t) * th) / s, f2 = Math.sin(t * th) / s;
+  return [a[0]*f1 + b[0]*f2, a[1]*f1 + b[1]*f2, a[2]*f1 + b[2]*f2];
+}
+function drawGlobe(now) {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const g = ctx.createRadialGradient(CX - 70, CY - 80, 40, CX, CY, R);
+  g.addColorStop(0, "#16233d");
+  g.addColorStop(1, "#080d18");
+  ctx.beginPath();
+  ctx.arc(CX, CY, R, 0, Math.PI * 2);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.strokeStyle = "#2a3557";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // graticule
+  ctx.strokeStyle = "rgba(110,140,190,0.18)";
+  ctx.lineWidth = 1;
+  for (let lat = -60; lat <= 60; lat += 20) {
+    ctx.beginPath();
+    let started = false;
+    for (let lon = -180; lon <= 180; lon += 4) {
+      const p = project(llToVec(lat, lon));
+      if (p.z > 0) { started ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); started = true; }
+      else started = false;
+    }
+    ctx.stroke();
+  }
+  for (let lon = -180; lon < 180; lon += 20) {
+    ctx.beginPath();
+    let started = false;
+    for (let lat = -84; lat <= 84; lat += 4) {
+      const p = project(llToVec(lat, lon));
+      if (p.z > 0) { started ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); started = true; }
+      else started = false;
+    }
+    ctx.stroke();
+  }
+
+  const tv = llToVec(TARGET.lat, TARGET.lon);
+  const tSec = now / 1000;
+
+  // arcs + projectiles
+  ATTACKERS.forEach((a, i) => {
+    if (a.lat == null || a.lon == null) return;
+    const av = llToVec(a.lat, a.lon);
+    ctx.beginPath();
+    let pen = false;
+    for (let s = 0; s <= 40; s++) {
+      const u = s / 40;
+      const v = slerp(av, tv, u);
+      const lift = 1 + 0.28 * Math.sin(Math.PI * u);
+      const p = project([v[0] * lift, v[1] * lift, v[2] * lift]);
+      if (p.z > -0.08) { pen ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); pen = true; }
+      else pen = false;
+    }
+    ctx.strokeStyle = "rgba(255,150,60,0.35)";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    // projectile with trail
+    const phase = (tSec * 0.22 + i * 0.37) % 1;
+    for (let k = 0; k < 6; k++) {
+      const u = phase - k * 0.02;
+      if (u < 0) continue;
+      const v = slerp(av, tv, u);
+      const lift = 1 + 0.28 * Math.sin(Math.PI * u);
+      const p = project([v[0] * lift, v[1] * lift, v[2] * lift]);
+      if (p.z <= 0) continue;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, k === 0 ? 3 : 1.6, 0, Math.PI * 2);
+      ctx.fillStyle = k === 0 ? "#ffd28a" : `rgba(255,176,84,${0.5 - k * 0.08})`;
+      ctx.fill();
+    }
+    // source point
+    const sp = project(av);
+    if (sp.z > 0) {
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 2.6 + Math.min(3, Math.log10((a.count || 1) + 1) * 1.6), 0, Math.PI * 2);
+      ctx.fillStyle = "#ff9d5c";
+      ctx.shadowColor = "#ff8c3a";
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  });
+
+  // target (Ishikari) with pulse
+  const tp = project(tv);
+  if (tp.z > 0) {
+    const pulse = (tSec % 1.6) / 1.6;
+    ctx.beginPath();
+    ctx.arc(tp.x, tp.y, 5 + pulse * 16, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(111,224,138,${0.7 * (1 - pulse)})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(tp.x, tp.y, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#6fe08a";
+    ctx.fill();
+    ctx.font = "600 14px system-ui, sans-serif";
+    ctx.fillStyle = "#c9f5d4";
+    ctx.fillText("石狩 ISHIKARI", tp.x + 12, tp.y + 4);
+  }
+  // labels for the most active sources facing us
+  ctx.font = "12px system-ui, sans-serif";
+  ATTACKERS.slice(0, 6).forEach(a => {
+    if (a.lat == null) return;
+    const p = project(llToVec(a.lat, a.lon));
+    if (p.z > 0.35) {
+      ctx.fillStyle = "rgba(200,215,240,0.85)";
+      const label = `${flag(a.country)} ${a.city || a.country_name || a.ip}`;
+      ctx.fillText(label, p.x + 9, p.y - 7);
+    }
+  });
+
+  rot += 0.0009;
+  requestAnimationFrame(drawGlobe);
+}
+requestAnimationFrame(drawGlobe);
+
+async function refresh() {
+  try {
+    const r = await fetch("status.json?_=" + Date.now());
+    const s = await r.json();
+    document.getElementById("gen").textContent =
+      "　最終更新 " + new Date(s.generated_at).toLocaleTimeString("ja-JP");
+    document.getElementById("dot").style.color = "#6fe08a";
+    const c = s.cowrie, k = s.canary;
+    ATTACKERS = (s.attackers || []).filter(a => a.lat != null && a.lon != null);
+    if (s.target) TARGET = s.target;
+    c_sess.textContent = c.sessions_today;
+    c_1h.textContent = c.sessions_1h;
+    c_active.textContent = c.active_sessions.length;
+    c_login.textContent = c.logins_today;
+    k_ev.textContent = k.events_today;
+    drawSpark(s.events_per_minute);
+    rows(document.getElementById("ips"),
+      (s.attackers || []).slice(0, 5).map(a => [
+        `${flag(a.country)} ${(a.city || "?")}, ${(a.country || "?")} — ${a.ip}`, a.count]));
+    rows(document.getElementById("creds"), c.top_credentials);
+    rows(document.getElementById("cmds"), c.top_commands);
+    rows(document.getElementById("ports"), k.by_port);
+    document.getElementById("feed").innerHTML = s.feed.map(f => {
+      const t = new Date(f.ts).toLocaleTimeString("ja-JP");
+      const warn = f.kind.includes("⚠") ? "warn" : "";
+      const geo = f.geo ? `<span class="geo">${flag(f.geo.country)} ${escapeHtml(f.geo.city || f.geo.country_name || "")}</span> ` : "";
+      return `<div><span class="t">${t}</span>${geo}<span class="src">${escapeHtml(f.src)}</span> ` +
+             `<span class="${warn}">${escapeHtml(f.kind)}</span> ${escapeHtml(f.detail)}</div>`;
+    }).join("");
+  } catch (e) {
+    document.getElementById("dot").style.color = "#e05a5a";
+  }
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

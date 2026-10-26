@@ -1,0 +1,9 @@
+/opt/cowrie/data/var/log/cowrie/cowrie.json /opt/cowrie/data/var/log/cowrie/cowrie.log {
+  daily
+  rotate 14
+  compress
+  copytruncate
+  missingok
+  notifempty
+  su ubuntu ubuntu
+}

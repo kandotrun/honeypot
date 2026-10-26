@@ -1,0 +1,418 @@
+#!/usr/bin/env python3
+"""Inert WordPress decoy; all captured input stays in the JSONL log."""
+import datetime as dt
+import html
+import json
+import os
+import re
+import ssl
+import sys
+import threading
+import urllib.parse
+import xml.etree.ElementTree as ET
+from xmlrpc.client import dumps as xmlrpc_dumps
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+LOG_LOCK = threading.Lock()
+GENERATOR = '<meta name="generator" content="WordPress 6.4.2">'
+PLUGIN_STABLE_VERSION = '2.3.1'
+BODY_LOG_LIMIT = 16384
+XMLRPC_CREDENTIAL_LIMIT = 20
+JSON_CONFIG_NAMES = ('settings.json', 'appsettings.json', 'config.json')
+
+
+
+# Public method names only; every authentication-dependent call remains a fault.
+XMLRPC_METHODS = (
+    'system.listMethods', 'system.getCapabilities', 'system.multicall',
+    'wp.getUsersBlogs', 'wp.newPost', 'wp.editPost', 'wp.deletePost',
+    'wp.getPost', 'wp.getPosts', 'wp.getPostType', 'wp.getPostTypes',
+    'wp.getPostFormats', 'wp.getPostStatusList', 'wp.getPageStatusList',
+    'wp.getPageTemplates', 'wp.getOptions', 'wp.setOptions',
+    'wp.getUsers', 'wp.getUser', 'wp.getProfile', 'wp.editProfile',
+    'wp.getCategories', 'wp.getTags', 'wp.newCategory', 'wp.deleteCategory',
+    'wp.suggestCategories', 'wp.getTaxonomy', 'wp.getTaxonomies',
+    'wp.getTerm', 'wp.getTerms', 'wp.newTerm', 'wp.editTerm', 'wp.deleteTerm',
+    'wp.getPage', 'wp.getPages', 'wp.getPageList', 'wp.newPage',
+    'wp.editPage', 'wp.deletePage', 'wp.getAuthors',
+    'wp.getComment', 'wp.getComments', 'wp.newComment', 'wp.editComment',
+    'wp.deleteComment', 'wp.getCommentCount', 'wp.getCommentStatusList',
+    'wp.getMediaItem', 'wp.getMediaLibrary', 'wp.uploadFile',
+    'wp.getRevisions', 'wp.restoreRevision',
+    'blogger.getUsersBlogs', 'blogger.getUserInfo', 'blogger.getPost',
+    'blogger.getRecentPosts', 'blogger.newPost', 'blogger.editPost',
+    'blogger.deletePost', 'metaWeblog.newPost', 'metaWeblog.editPost',
+    'metaWeblog.getPost', 'metaWeblog.getRecentPosts',
+    'metaWeblog.getCategories', 'metaWeblog.newMediaObject',
+    'metaWeblog.deletePost', 'metaWeblog.getUsersBlogs',
+    'mt.getCategoryList', 'mt.getRecentPostTitles', 'mt.getPostCategories',
+    'mt.setPostCategories', 'mt.supportedMethods', 'mt.supportedTextFilters',
+    'mt.getTrackbackPings', 'mt.publishPost',
+    'pingback.ping', 'pingback.extensions.getPingbacks',
+    'demo.sayHello', 'demo.addTwoNumbers',
+)
+
+
+def xmlrpc_metadata(body):
+    """Read only the primary method and direct multicall structs, never entities."""
+    if '<!DOCTYPE' in body.upper() or '<!ENTITY' in body.upper():
+        return {}
+    try:
+        root = ET.fromstring(body)
+    except (ET.ParseError, ValueError):
+        return {}
+    if root.tag != 'methodCall':
+        return {}
+    method = root.findtext('methodName', '').strip()
+    metadata = {'xmlrpc_method': method} if method else {}
+    if method == 'system.multicall':
+        count = len(root.findall('./params/param/value/array/data/value/struct'))
+        if count:
+            metadata['xmlrpc_multicall_count'] = count
+    return metadata
+
+
+def xml_credentials(body):
+    """Recognize positional WordPress XML-RPC arguments without executing XML."""
+    if '<!DOCTYPE' in body.upper() or '<!ENTITY' in body.upper():
+        return {}
+    try:
+        root = ET.fromstring(body)
+    except (ET.ParseError, ValueError):
+        return {}
+    pairs = []
+    def collect(method, values):
+        offset = 0 if method == 'wp.getUsersBlogs' else 1
+        if method.startswith(('wp.', 'blogger.', 'metaWeblog.')):
+            args = [v.find('string') for v in values]
+            if len(args) > offset + 1 and all(x is not None for x in args[offset:offset + 2]):
+                pair = [x.text or '' for x in args[offset:offset + 2]]
+                if pair not in pairs:
+                    pairs.append(pair)
+    collect(root.findtext('methodName', ''), root.findall('./params/param/value'))
+    for struct in root.findall('.//struct'):
+        members = {m.findtext('name'): m.find('value') for m in struct.findall('member')}
+        method = members.get('methodName')
+        params = members.get('params')
+        if method is not None and params is not None:
+            collect(method.findtext('string', ''), params.findall('./array/data/value'))
+    if not pairs:
+        return {}
+    # Scalar fields preserve the common single-call schema; a list retains up to 20 pairs.
+    return {'xmlrpc_user': pairs[0][0], 'xmlrpc_pass': pairs[0][1],
+            'xmlrpc_credentials': pairs[:XMLRPC_CREDENTIAL_LIMIT]}
+
+
+def classify(method, path, query, headers, body):
+    lower = urllib.parse.unquote(path).lower()
+    if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
+                                'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or (
+            '/wp-content/uploads' in lower and 'upload' in lower) or (
+            lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES):
+        return {'event': 'exploit_probe'}
+    if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
+            and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
+        fields = urllib.parse.parse_qs(body, keep_blank_values=True) if method == 'POST' else {}
+        return {'event': 'lostpassword', 'lostpassword_user': fields.get('user_login', [''])[0]}
+    if path == '/wp-login.php' and method == 'POST':
+        fields = urllib.parse.parse_qs(body, keep_blank_values=True)
+        return {'event': 'wp_login', 'username': fields.get('log', [''])[0],
+                'password': fields.get('pwd', [''])[0]}
+    if path == '/xmlrpc.php' and method == 'POST':
+        return {'event': 'xmlrpc', **xml_credentials(body), **xmlrpc_metadata(body)}
+    if path == '/wp-admin' or path.startswith('/wp-admin/'):
+        return {'event': 'admin_probe'}
+    for kind in ('plugin', 'theme'):
+        match = re.match(r'/wp-content/' + kind + r's/([^/]+)(?:/|$)', path)
+        if match:
+            return {'event': kind + '_probe', kind: match.group(1)}
+    if method in ('GET', 'HEAD'):
+        routes = {'/': 'page_home', '/wp-login.php': 'page_login',
+                  '/xmlrpc.php': 'page_xmlrpc', '/wp-json': 'rest_index',
+                  '/wp-json/': 'rest_index', '/wp-json/wp/v2/users': 'rest_users',
+                  '/wp-json/wp/v2/posts': 'rest_posts',
+                  '/wp-json/wp/v2/pages': 'rest_pages',
+                  '/wp-json/wp/v2/types': 'rest_types',
+                  '/wp-json/wp/v2/categories': 'rest_categories',
+                  '/wp-json/wp/v2/comments': 'rest_comments',
+                  '/wp-json/wp/v2/settings': 'rest_forbidden',
+                  '/wp-json/wp/v2/themes': 'rest_forbidden',
+                  '/wp-json/wp/v2/plugins': 'rest_forbidden'}
+        if path in ('/', '/index.php'):
+            params = urllib.parse.parse_qs(query, keep_blank_values=True)
+            if 'rest_route' in params:
+                rest_path = '/wp-json/' + params['rest_route'][0].strip('/')
+                if rest_path in routes:
+                    return {'event': routes[rest_path]}
+        if (path == '/' and urllib.parse.parse_qs(query).get('author') == ['1']) or path in (
+                '/author/admin/', '/author/admin'):
+            return {'event': 'author_probe', 'author': 'admin'}
+        if path in routes:
+            return {'event': routes[path]}
+    return {'event': 'http_request'}
+
+
+def page(content):
+    return ('<!doctype html><html><head><title>WordPress</title>' + GENERATOR +
+            '<link rel="stylesheet" href="/wp-content/themes/twentytwentyfour/style.css">'
+            '<script src="/wp-includes/js/jquery/jquery.min.js"></script></head>'
+            '<body><header><h1>My WordPress Blog</h1></header><main>' + content +
+            '</main><footer>Proudly powered by WordPress</footer></body></html>')
+
+
+def login(error=''):
+    return page(error + '<h1>Log In</h1><form method="post" action="/wp-login.php">'
+                '<label>Username <input name="log"></label>'
+                '<label>Password <input type="password" name="pwd"></label>'
+                '<input type="checkbox" name="remember-me" value="forever">Remember Me'
+                '<input type="hidden" name="redirect_to" value="/wp-admin/">'
+                '<input type="hidden" name="testcookie" value="1">'
+                '<button type="submit">Log In</button></form>')
+
+
+def lostpassword(error=''):
+    return page(error + '<h1>Lost Password</h1>'
+                '<p>Please enter your username or email address. You will receive a link '
+                'to create a new password via email.</p>'
+                '<form method="post" action="/wp-login.php?action=lostpassword">'
+                '<label>Username or Email Address <input name="user_login"></label>'
+                '<button type="submit">Get New Password</button></form>'
+                '<a href="/wp-login.php">Log in</a>')
+
+
+def response(method, path, event):
+    kind = event['event']
+    status, mime, headers = 200, 'text/html; charset=utf-8', {}
+    content = page('<h1>Oops! That page can’t be found.</h1>')
+    if kind == 'page_home':
+        content = page('<article><h2>Hello world!</h2><p>Welcome to WordPress.</p></article>'
+                       '<article><h2>A beautiful autumn morning</h2></article>')
+    elif kind == 'author_probe':
+        if path == '/':
+            status, headers['Location'], content = 302, '/author/admin/', ''
+        else:
+            content = page('<h1>admin</h1>'
+                           '<article><h2>Hello world!</h2><p>Welcome to WordPress.</p></article>'
+                           '<article><h2>A beautiful autumn morning</h2></article>')
+    elif kind in ('page_login', 'wp_login'):
+        error = ''
+        if kind == 'wp_login':
+            error = '<div id="login_error">Error: The password you entered for the username ' + html.escape(event['username']) + ' is incorrect.</div>'
+        content = login(error)
+        headers['Set-Cookie'] = 'wordpress_test_cookie=WP%20Cookie%20check; path=/'
+    elif kind == 'lostpassword':
+        if method == 'POST' and event['lostpassword_user'] == 'admin':
+            content = login('<div class="message">Check your email for the confirmation link.</div>')
+        else:
+            error = ('<div id="login_error">Error: Invalid username or email address.</div>'
+                     if method == 'POST' else '')
+            content = lostpassword(error)
+        headers['Set-Cookie'] = 'wordpress_test_cookie=WP%20Cookie%20check; path=/'
+    elif kind == 'page_xmlrpc':
+        mime, content = 'text/plain; charset=utf-8', 'XML-RPC server accepts POST requests only.'
+    elif kind == 'xmlrpc':
+        mime = 'text/xml; charset=utf-8'
+        content = '<?xml version="1.0"?><methodResponse><fault><value><struct><member><name>faultCode</name><value><int>403</int></value></member><member><name>faultString</name><value><string>Incorrect username or password.</string></value></member></struct></value></fault></methodResponse>'
+        xml_method = event.get('xmlrpc_method', '')
+        if xml_method == 'system.listMethods':
+            content = xmlrpc_dumps((list(XMLRPC_METHODS),), methodresponse=True)
+        elif xml_method == 'system.getCapabilities':
+            capabilities = {
+                'xmlrpc': {'specUrl': 'http://www.xmlrpc.com/spec', 'specVersion': 1},
+                'faults_interop': {
+                    'specUrl': 'http://xmlrpc-epi.sourceforge.net/specs/rfc.fault_codes.php',
+                    'specVersion': 20010516},
+                'system.multicall': {
+                    'specUrl': 'http://www.xmlrpc.com/discuss/msgReader$1208',
+                    'specVersion': 1},
+            }
+            content = xmlrpc_dumps((capabilities,), methodresponse=True)
+        elif xml_method == 'system.multicall':
+            faults = [{'faultCode': 403,
+                       'faultString': 'Incorrect username or password.'}
+                      for _ in range(event.get('xmlrpc_multicall_count', 1))]
+            content = xmlrpc_dumps((faults,), methodresponse=True)
+    elif kind in ('rest_index', 'rest_users', 'rest_posts', 'rest_pages', 'rest_types',
+                  'rest_categories', 'rest_comments', 'rest_forbidden'):
+        mime = 'application/json; charset=utf-8'
+        if kind == 'rest_index':
+            data = {'name': 'My WordPress Blog', 'description': 'Just another WordPress site', 'url': 'http://localhost', 'namespaces': ['wp/v2'], 'routes': {
+                '/wp/v2/' + route: {'methods': ['GET']} for route in (
+                    'users', 'posts', 'pages', 'types', 'categories', 'comments',
+                    'settings', 'themes', 'plugins')}}
+        elif kind == 'rest_users':
+            data = [{'id': 1, 'name': 'admin', 'slug': 'admin', 'link': '/author/admin/', 'avatar_urls': {'96': '/wp-content/uploads/avatar.png'}, '_links': {'self': [{'href': '/wp-json/wp/v2/users/1'}]}}]
+        elif kind == 'rest_posts':
+            data = [{'id': 1, 'slug': 'hello-world', 'status': 'publish', 'type': 'post',
+                     'title': {'rendered': 'Hello world!'},
+                     'excerpt': {'rendered': 'Welcome to WordPress.'},
+                     'author': 1, 'categories': [1],
+                     '_links': {'self': [{'href': '/wp-json/wp/v2/posts/1'}]}}]
+        elif kind == 'rest_pages':
+            data = [{'id': 2, 'slug': 'sample-page',
+                     'title': {'rendered': 'Sample Page'}, 'author': 1}]
+        elif kind == 'rest_types':
+            data = {'post': {'name': 'Posts', 'slug': 'post', 'rest_base': 'posts'},
+                    'page': {'name': 'Pages', 'slug': 'page', 'rest_base': 'pages'}}
+        elif kind == 'rest_categories':
+            data = [{'id': 1, 'name': 'Uncategorized', 'slug': 'uncategorized', 'count': 1}]
+        elif kind == 'rest_comments':
+            data = [{'id': 1, 'post': 1, 'author_name': 'admin',
+                     'content': {'rendered': 'Hi, this is a comment.'}}]
+        else:
+            status = 401
+            data = {'code': 'rest_forbidden_context',
+                    'message': 'Sorry, you are not allowed to do that.',
+                    'data': {'status': 401}}
+        content = json.dumps(data)
+    elif kind == 'admin_probe':
+        status, headers['Location'], content = 302, '/wp-login.php', ''
+    elif kind == 'plugin_probe' and path.rsplit('/', 1)[-1].lower() == 'readme.txt':
+        mime = 'text/plain; charset=utf-8'
+        content = ('=== ' + event['plugin'].title() + ' ===\n'
+                   'Requires at least: 5.0\nTested up to: 6.4\nRequires PHP: 7.4\n'
+                   'Stable tag: ' + PLUGIN_STABLE_VERSION + '\n'
+                   'License: GPLv2 or later\n\n'
+                   '== Description ==\nA WordPress plugin.\n')
+    elif kind == 'plugin_probe' and path.rsplit('/', 1)[-1].lower() in (
+            'change_log.txt', 'changelog.txt', 'changelog.md'):
+        mime = 'text/plain; charset=utf-8'
+        content = ('== Changelog ==\n\n'
+                   '= ' + PLUGIN_STABLE_VERSION + ' - 2023-12-12 =\n'
+                   '* Minor fixes and compatibility improvements.\n\n'
+                   '= 2.3.0 - 2023-10-18 =\n'
+                   '* General improvements and maintenance fixes.\n\n'
+                   '= 2.2.0 - 2023-08-09 =\n'
+                   '* Improved reliability and fixed minor display issues.\n')
+    elif kind == 'theme_probe' and path.endswith('style.css'):
+        mime, content = 'text/css; charset=utf-8', '/* Theme Name: WordPress Theme\nVersion: 1.0.0\n*/\n'
+    elif path == '/wp-includes/js/jquery/jquery.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* jQuery v3.7.1 - synthetic decoy stub */\n'
+                   'window.jQuery = {version: "3.7.1"};\n')
+    elif path == '/robots.txt' and method in ('GET', 'HEAD'):
+        mime, content = 'text/plain; charset=utf-8', 'User-agent: *\nDisallow: /wp-admin/\nAllow: /wp-admin/admin-ajax.php\n'
+    else:
+        lower = urllib.parse.unquote(path).lower()
+        if kind == 'exploit_probe' and 'wp-config.php' in lower:
+            status = 403
+        elif kind == 'exploit_probe' and '.env' in lower:
+            mime = 'text/plain; charset=utf-8'
+            content = ('# Synthetic decoy configuration; no real credentials\n'
+                       'APP_ENV=production\nAPP_DEBUG=false\n'
+                       'DB_HOST=localhost\nDB_DATABASE=wordpress\nDB_USERNAME=wp_user\n'
+                       'DB_PASSWORD=synthetic-decoy-password-not-real\n'
+                       'APP_KEY=synthetic-decoy-app-key-not-real\n'
+                       'API_KEY=synthetic-decoy-api-key-not-real\n'
+                       'CACHE_DRIVER=file\nSESSION_DRIVER=file\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in JSON_CONFIG_NAMES:
+            mime = 'application/json; charset=utf-8'
+            content = json.dumps({
+                'environment': 'synthetic-decoy',
+                'database': {'host': 'localhost', 'name': 'synthetic-decoy-database',
+                             'username': 'synthetic-decoy-user',
+                             'password': 'synthetic-decoy-password-not-real'},
+                'api': {'key': 'synthetic-decoy-api-key-not-real'},
+            })
+        elif (method in ('GET', 'HEAD') and lower.rsplit('/', 1)[-1] == 'info.php'
+              and 'phpinfo' not in lower):
+            content = ('<!doctype html><html><head><title>phpinfo()</title>'
+                       '<style>body{font-family:sans-serif;color:#222;background:#fff}'
+                       'table{border-collapse:collapse;width:80%;margin:20px auto}'
+                       'td,th{border:1px solid #666;padding:6px;text-align:left}'
+                       'th{background:#99c}td{background:#ddd}</style></head><body>'
+                       '<table><tr><th colspan="2">PHP Version 8.1.2</th></tr>'
+                       '<tr><td>Server API</td><td>Apache 2.4.52 (Ubuntu)</td></tr>'
+                       '<tr><td>Loaded Modules</td><td>core, curl, gd, json, mbstring, '
+                       'mysqli, openssl, xml, zip</td></tr>'
+                       '<tr><td>DOCUMENT_ROOT</td><td>/var/www/html</td></tr>'
+                       '</table></body></html>')
+        else:
+            status = 404
+    return status, mime, headers, content.encode('utf-8')
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = 'Apache/2.4.52 (Ubuntu)'
+    sys_version = ''
+    timeout = 10
+
+    def version_string(self):
+        return self.server_version
+
+    def log_message(self, *args):
+        pass
+
+    def __getattr__(self, name):
+        if name.startswith('do_'):
+            return self.handle_request
+        raise AttributeError(name)
+
+    def handle_request(self):
+        body = b''
+        try:
+            length = max(0, int(self.headers.get('Content-Length', '0')))
+        except ValueError:
+            length = 0
+        try:
+            body = self.rfile.read(min(length, 65536))
+        except (OSError, TimeoutError):
+            pass
+        decoded = body.decode('utf-8', errors='replace')
+        path, _, query = self.path.partition('?')
+        event = classify(self.command, path, query, self.headers, decoded)
+        status, mime, headers, payload = response(self.command, path, event)
+        record = {'ts': dt.datetime.now().astimezone().isoformat(),
+                  'src_ip': self.client_address[0], 'method': self.command,
+                  'path': path, 'query': query, 'user_agent': self.headers.get('User-Agent', ''),
+                  **event, 'status': status, 'body': decoded[:BODY_LOG_LIMIT]}
+        with LOG_LOCK:
+            with open(os.environ.get('WP_LOG', '/data/wp.jsonl'), 'a', encoding='utf-8') as log:
+                log.write(json.dumps(record, ensure_ascii=True) + '\n')
+                log.flush()
+        try:
+            self.send_response(status)
+            self.send_header('X-Powered-By', 'PHP/8.1.2')
+            self.send_header('Content-Type', mime)
+            self.send_header('Content-Length', str(len(payload)))
+            for key, value in headers.items():
+                self.send_header(key, value)
+            self.end_headers()
+            if self.command != 'HEAD':
+                self.wfile.write(payload)
+        except (OSError, TimeoutError):
+            pass
+
+
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        # Disconnects and socket timeouts are expected on an internet decoy.
+        if not isinstance(sys.exception(), (OSError, TimeoutError)):
+            super().handle_error(request, client_address)
+
+
+def main():
+    log_path = os.environ.get('WP_LOG', '/data/wp.jsonl')
+    os.makedirs(os.path.dirname(os.path.abspath(log_path)), exist_ok=True)
+    http = Server(('0.0.0.0', int(os.environ.get('WP_PORT', '8080'))), Handler)
+    cert, key = os.environ.get('WP_CERT', '/certs/cert.pem'), os.environ.get('WP_KEY', '/certs/key.pem')
+    if os.path.isfile(cert) and os.path.isfile(key):
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(cert, key)
+        https = Server(('0.0.0.0', int(os.environ.get('WP_TLS_PORT', '8443'))), Handler)
+        https.socket = context.wrap_socket(https.socket, server_side=True)
+        threading.Thread(target=https.serve_forever, daemon=True).start()
+    else:
+        print('HTTPS listener skipped: certificate or key file missing', file=sys.stderr, flush=True)
+    try:
+        http.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        http.server_close()
+
+
+if __name__ == '__main__':
+    main()

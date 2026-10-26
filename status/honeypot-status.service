@@ -1,0 +1,7 @@
+[Unit]
+Description=Build honeypot realtime status.json
+After=network.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/honeypot-status/producer.py

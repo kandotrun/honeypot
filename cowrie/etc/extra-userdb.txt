@@ -1,0 +1,19 @@
+# Extra credential pairs to APPEND to the image's default userdb.txt
+# at deploy time (do not replace the default file wholesale).
+# Format: login:x:password   (! prefix = deny that password)
+root:x:12345
+root:x:password
+root:x:admin
+admin:x:admin
+admin:x:123456
+ubuntu:x:ubuntu
+ubuntu:x:password
+user:x:user
+pi:x:raspberry
+oracle:x:oracle
+postgres:x:postgres
+ftpuser:x:ftpuser
+test:x:test
+guest:x:guest
+support:x:support
+operator:x:operator

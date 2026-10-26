@@ -1,0 +1,53 @@
+services:
+  opencanary:
+    build: .
+    image: opencanary-local:latest
+    container_name: opencanary
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      # twistd drops to nobody/nogroup after binding; without
+      # CAP_SETUID/SETGID a capability-less root cannot switch.
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 192m
+    memswap_limit: 192m
+    cpus: 0.5
+    pids_limit: 100
+    tmpfs:
+      - /tmp
+      # opencanaryd writes /var/run/opencanaryd.pid (-> /run) at startup.
+      - /run
+    ports:
+      - "133.125.35.179:21:21"
+      - "133.125.35.179:80:80"
+      - "133.125.35.179:443:443"
+      - "133.125.35.179:8080:8080"
+      - "133.125.35.179:3306:3306"
+      - "133.125.35.179:1433:1433"
+      - "133.125.35.179:6379:6379"
+      - "133.125.35.179:5900:5900"
+      - "133.125.35.179:5060:5060"
+      - "133.125.35.179:5060:5060/udp"
+    volumes:
+      - ./data/logs:/var/log/opencanary
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      canary:
+        ipv4_address: 172.31.0.10
+
+networks:
+  canary:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24

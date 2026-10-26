@@ -1,0 +1,31 @@
+services:
+  wp-honeypot:
+    build: .
+    container_name: wp-honeypot
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    pids_limit: 100
+    ports:
+      # Public interface only, like the other sensors.
+      - "133.125.35.179:80:8080"
+      - "133.125.35.179:443:8443"
+    volumes:
+      - ./data:/data
+      - ./certs:/certs:ro
+    environment:
+      WP_LOG: /data/wp.jsonl
+      WP_CERT: /certs/cert.pem
+      WP_KEY: /certs/key.pem
+    networks:
+      canary:
+        ipv4_address: 172.31.0.20
+
+# Joins OpenCanary's network (172.31.0.0/24) so the existing
+# block-outbound.sh policy in /opt/cowrie covers this container too.
+networks:
+  canary:
+    external: true
+    name: opencanary_canary

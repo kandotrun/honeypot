@@ -1,0 +1,14 @@
+[Unit]
+Description=Serve honeypot status on the tailnet interface only
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+ExecStart=/usr/bin/python3 -m http.server 8901 --bind 100.124.133.46 --directory /opt/honeypot-status
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

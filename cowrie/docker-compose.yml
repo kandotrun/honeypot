@@ -1,0 +1,41 @@
+# Cowrie honeypot for Sakura VPS (133.125.35.179)
+# Deploy dir on VPS: /opt/cowrie
+# Verify container-internal paths at deploy time (docker exec cowrie ls).
+services:
+  cowrie:
+    image: cowrie/cowrie:latest
+    container_name: cowrie
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: 0.5
+    pids_limit: 100
+    # Publish ONLY on the public IP. Admin SSH lives on the Tailscale
+    # interface, so there is no port conflict and Cowrie is not
+    # reachable from the tailnet.
+    ports:
+      - "133.125.35.179:22:2222"
+      - "133.125.35.179:23:2223"
+    volumes:
+      # Current cowrie image: WORKDIR=/cowrie/cowrie-git, runs as uid 999.
+      # Config search path is ./etc relative to the workdir; data paths
+      # (var/log/cowrie etc.) are also relative to the workdir.
+      - ./etc/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      - ./etc/userdb.txt:/cowrie/cowrie-git/etc/userdb.txt:ro
+      - ./data/var:/cowrie/cowrie-git/var
+    tmpfs:
+      - /tmp
+    networks:
+      - honeypot
+
+networks:
+  honeypot:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh honeypot status every 10 seconds
+
+[Timer]
+OnBootSec=20s
+OnUnitActiveSec=10s
+AccuracySec=1s
+Unit=honeypot-status.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Block outbound connections from Cowrie network
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/cowrie/block-outbound.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
