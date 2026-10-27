@@ -800,6 +800,12 @@ def response(method, path, event, query=''):
         content = ('/* Synthetic decoy stub for media-views */\n'
                    'window.wp = window.wp || {};\n'
                    'window.wp.media = {};\n')
+    elif path == '/wp-includes/js/media-models.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for media-models */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.media = window.wp.media || {};\n'
+                   'window.wp.media.model = {};\n')
     elif path == '/wp-includes/wlwmanifest.xml' and method in ('GET', 'HEAD'):
         mime = 'application/xml; charset=utf-8'
         content = ('<?xml version="1.0" encoding="utf-8" ?>\n'
