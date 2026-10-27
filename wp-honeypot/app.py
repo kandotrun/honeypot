@@ -28,19 +28,30 @@ COMPOSE_CONFIG_NAMES = ('docker-compose.yml', 'docker-compose.yaml')
 SECRETS_CONFIG_NAMES = ('secrets.yaml', 'secrets.yml')
 CONFIG_YAML_NAMES = ('.config.yaml',)
 CONFIG_INI_NAMES = ('config.ini',)
-CONFIG_JS_NAMES = ('config.js',)
+CONFIG_JS_NAMES = ('config.js', 'env-config.js')
 PARAMETERS_YML_NAMES = ('parameters.yml',)
 AWS_YML_NAMES = ('aws.yml',)
 DATABASE_YML_NAMES = ('database.yml',)
 APPLICATION_YML_NAMES = ('application.yml',)
+APPLICATION_PROPERTIES_NAMES = ('application.properties',)
 ENV_EXAMPLE_NAMES = ('env.example',)
 PACKAGE_CONFIG_NAMES = ('package.json',)
 PACKAGE_LOCK_NAMES = ('package-lock.json',)
+YARN_LOCK_NAMES = ('yarn.lock',)
 COMPOSER_CONFIG_NAMES = ('composer.json',)
 CLIENT_SECRETS_NAMES = ('client_secrets.json',)
 CREDENTIALS_CONFIG_NAMES = ('credentials.json',)
+GOOGLE_SERVICES_NAMES = ('google-services.json',)
 SECRETS_JSON_NAMES = ('secrets.json', 'env.json')
 CREDENTIALS_XML_NAMES = ('credentials.xml',)
+CONFIGURATION_NAMES = ('configuration.yaml', 'configuration.xml', 'configuration.json')
+WEB_CONFIG_NAMES = ('web.config',)
+DATABASE_CONFIG_NAMES = ('database.config',)
+TERRAFORM_TFSTATE_NAMES = ('terraform.tfstate',)
+README_MD_NAMES = ('readme.md',)
+CROSSDOMAIN_XML_NAMES = ('crossdomain.xml',)
+SETTINGS_PY_NAMES = ('settings.py',)
+REQUIREMENTS_TXT_NAMES = ('requirements.txt',)
 CREDENTIALS_INI_NAMES = ('credentials.ini',)
 COMPOSER_LOCK_NAMES = ('composer.lock',)
 DEBUG_LOG_NAMES = ('debug.log',)
@@ -49,6 +60,8 @@ ERROR_LOG_NAMES = ('error.log', 'php_error.log', 'php_errors.log')
 LARAVEL_LOG_NAMES = ('laravel.log',)
 APP_LOG_NAMES = ('app.log',)
 SITE_ARCHIVE_NAMES = ('site.zip', 'backup.zip', 'www.zip')
+GITLAB_CI_NAMES = ('.gitlab-ci.yml',)
+DOCKERFILE_NAMES = ('dockerfile',)
 
 
 
@@ -136,9 +149,9 @@ def xml_credentials(body):
 def classify(method, path, query, headers, body):
     lower = urllib.parse.unquote(path).lower()
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
-                                'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or lower in ('/.aws/credentials', '/.aws/config') or (
+                                'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or lower in ('/.aws/credentials', '/.aws/config', '/.kube/config') or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + CONFIG_JS_NAMES + PARAMETERS_YML_NAMES + AWS_YML_NAMES + DATABASE_YML_NAMES + APPLICATION_YML_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + PACKAGE_LOCK_NAMES + COMPOSER_CONFIG_NAMES + CLIENT_SECRETS_NAMES + CREDENTIALS_CONFIG_NAMES + SECRETS_JSON_NAMES + CREDENTIALS_XML_NAMES + CREDENTIALS_INI_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + SQL_DUMP_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + APP_LOG_NAMES + SITE_ARCHIVE_NAMES):
+            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + CONFIG_JS_NAMES + PARAMETERS_YML_NAMES + AWS_YML_NAMES + DATABASE_YML_NAMES + APPLICATION_YML_NAMES + APPLICATION_PROPERTIES_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + PACKAGE_LOCK_NAMES + YARN_LOCK_NAMES + COMPOSER_CONFIG_NAMES + CLIENT_SECRETS_NAMES + CREDENTIALS_CONFIG_NAMES + GOOGLE_SERVICES_NAMES + SECRETS_JSON_NAMES + CREDENTIALS_XML_NAMES + CONFIGURATION_NAMES + WEB_CONFIG_NAMES + DATABASE_CONFIG_NAMES + TERRAFORM_TFSTATE_NAMES + README_MD_NAMES + CROSSDOMAIN_XML_NAMES + SETTINGS_PY_NAMES + REQUIREMENTS_TXT_NAMES + CREDENTIALS_INI_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + SQL_DUMP_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + APP_LOG_NAMES + SITE_ARCHIVE_NAMES + GITLAB_CI_NAMES + DOCKERFILE_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -176,18 +189,30 @@ def classify(method, path, query, headers, body):
             return {'event': kind + '_probe', kind: match.group(1)}
     if method in ('GET', 'HEAD'):
         if path in ('/feed', '/feed/', '/feed/rss2', '/feed/rss2/',
-                    '/feed/rss', '/feed/rss/', '/comments/feed', '/comments/feed/') or (
-                path in ('/', '/index.php') and any(value in ('rss2', 'rss')
+                    '/feed/rss', '/feed/rss/', '/comments/feed', '/comments/feed/',
+                    '/feed/atom', '/feed/atom/', '/feed/rdf', '/feed/rdf/',
+                    '/comments/feed/atom', '/comments/feed/atom/',
+                    '/comments/feed/rdf', '/comments/feed/rdf/') or (
+                path in ('/', '/index.php') and any(value in ('rss2', 'rss', 'atom', 'rdf')
                     for value in urllib.parse.parse_qs(query).get('feed', []))):
             return {'event': 'feed'}
-        routes = {'/': 'page_home', '/wp-login.php': 'page_login',
+        routes = {'/': 'page_home', '/index.php': 'page_home', '/wp-login.php': 'page_login',
                   '/xmlrpc.php': 'page_xmlrpc', '/wp-json': 'rest_index',
-                  '/wp-json/': 'rest_index', '/wp-json/wp/v2/users': 'rest_users',
+                  '/wp-json/': 'rest_index', '/wp-json/wp/v2': 'rest_index',
+                  '/wp-json/wp/v2/': 'rest_index',
+                  '/wp-json/wp/v2/users': 'rest_users',
+                  '/wp-json/wp/v2/users/1': 'rest_users',
                   '/wp-json/wp/v2/posts': 'rest_posts',
+                  '/wp-json/wp/v2/posts/1': 'rest_posts',
                   '/wp-json/wp/v2/pages': 'rest_pages',
+                  '/wp-json/wp/v2/pages/2': 'rest_pages',
                   '/wp-json/wp/v2/types': 'rest_types',
+                  '/wp-json/wp/v2/types/post': 'rest_types',
+                  '/wp-json/wp/v2/types/page': 'rest_types',
                   '/wp-json/wp/v2/categories': 'rest_categories',
+                  '/wp-json/wp/v2/categories/1': 'rest_categories',
                   '/wp-json/wp/v2/comments': 'rest_comments',
+                  '/wp-json/wp/v2/comments/1': 'rest_comments',
                   '/wp-json/wp/v2/settings': 'rest_forbidden',
                   '/wp-json/wp/v2/themes': 'rest_forbidden',
                   '/wp-json/wp/v2/plugins': 'rest_forbidden'}
@@ -197,11 +222,21 @@ def classify(method, path, query, headers, body):
                 rest_path = '/wp-json/' + params['rest_route'][0].strip('/')
                 if rest_path in routes:
                     return {'event': routes[rest_path]}
+                if re.fullmatch(r'/wp-json/wp/v2/types/([a-z0-9_-]+)', rest_path):
+                    return {'event': 'rest_types'}
+                match = re.fullmatch(r'/wp-json/wp/v2/(posts|pages|users|categories|comments)/[0-9]+', rest_path)
+                if match:
+                    return {'event': 'rest_' + match.group(1)}
         if (path == '/' and urllib.parse.parse_qs(query).get('author') == ['1']) or path in (
                 '/author/admin/', '/author/admin'):
             return {'event': 'author_probe', 'author': 'admin'}
         if path in routes:
             return {'event': routes[path]}
+        if re.fullmatch(r'/wp-json/wp/v2/types/([a-z0-9_-]+)', path):
+            return {'event': 'rest_types'}
+        match = re.fullmatch(r'/wp-json/wp/v2/(posts|pages|users|categories|comments)/[0-9]+', path)
+        if match:
+            return {'event': 'rest_' + match.group(1)}
     return {'event': 'http_request'}
 
 
@@ -233,30 +268,118 @@ def lostpassword(error=''):
                 '<a href="/wp-login.php">Log in</a>')
 
 
-def response(method, path, event):
+def response(method, path, event, query=''):
     kind = event['event']
     status, mime, headers = 200, 'text/html; charset=utf-8', {}
     content = page('<h1>Oops! That page can’t be found.</h1>')
     if kind == 'page_home':
-        content = page('<article><h2>Hello world!</h2><p>Welcome to WordPress.</p></article>'
-                       '<article><h2>A beautiful autumn morning</h2></article>')
+        if (method in ('GET', 'HEAD') and path in ('/', '/index.php')
+                and urllib.parse.parse_qs(query).get('p') == ['1']):
+            status, headers['Location'], content = 301, '/hello-world/', ''
+        elif (method in ('GET', 'HEAD') and path in ('/', '/index.php')
+                and urllib.parse.parse_qs(query).get('page_id') == ['2']):
+            status, headers['Location'], content = 301, '/sample-page/', ''
+        else:
+            content = page('<article><h2>Hello world!</h2><p>Welcome to WordPress.</p></article>'
+                           '<article><h2>A beautiful autumn morning</h2></article>')
     elif kind == 'feed':
-        mime = 'application/rss+xml; charset=utf-8'
-        content = ('<?xml version="1.0" encoding="UTF-8"?>'
-                   '<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">'
-                   '<channel><title>My WordPress Blog</title>'
-                   '<link>http://localhost</link>'
-                   '<description>Just another WordPress site</description>'
-                   '<language>en-US</language>'
-                   '<generator>https://wordpress.org/?v=6.4.2</generator>'
-                   '<lastBuildDate>Tue, 12 Dec 2023 00:00:00 +0000</lastBuildDate>'
-                   '<item><title>Hello world!</title>'
-                   '<link>http://localhost/?p=1</link>'
-                   '<guid>http://localhost/?p=1</guid>'
-                   '<pubDate>Tue, 12 Dec 2023 00:00:00 +0000</pubDate>'
-                   '<dc:creator>admin</dc:creator><category>Uncategorized</category>'
-                   '<description>Welcome to WordPress.</description>'
-                   '</item></channel></rss>')
+        if path in ('/comments/feed/rdf', '/comments/feed/rdf/'):
+            mime = 'application/rss+xml; charset=utf-8'
+            content = ('<?xml version="1.0" encoding="UTF-8"?>'
+                       '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" '
+                       'xmlns="http://purl.org/rss/1.0/" '
+                       'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+                       '<channel rdf:about="http://localhost">'
+                       '<title>Comments for My WordPress Blog</title>'
+                       '<link>http://localhost</link>'
+                       '<description>Just another WordPress site</description>'
+                       '<items><rdf:Seq><rdf:li rdf:resource="http://localhost/?p=1#comment-1"/>'
+                       '</rdf:Seq></items></channel>'
+                       '<item rdf:about="http://localhost/?p=1#comment-1">'
+                       '<title>Comment on Hello world!</title>'
+                       '<link>http://localhost/?p=1#comment-1</link>'
+                       '<dc:date>2023-12-12T00:00:00Z</dc:date>'
+                       '<dc:creator>admin</dc:creator>'
+                       '<description>Hi, this is a comment.</description>'
+                       '</item></rdf:RDF>')
+        elif path in ('/comments/feed/atom', '/comments/feed/atom/'):
+            mime = 'application/atom+xml; charset=utf-8'
+            content = ('<?xml version="1.0" encoding="UTF-8"?>'
+                       '<feed xmlns="http://www.w3.org/2005/Atom">'
+                       '<title>Comments for My WordPress Blog</title>'
+                       '<subtitle>Just another WordPress site</subtitle>'
+                       '<updated>2023-12-12T00:00:00Z</updated>'
+                       '<link rel="alternate" href="http://localhost"/>'
+                       '<id>http://localhost/comments/feed/atom/</id>'
+                       '<link rel="self" type="application/atom+xml" href="http://localhost/comments/feed/atom/"/>'
+                       '<generator uri="https://wordpress.org/" version="6.4.2">WordPress</generator>'
+                       '<entry><author><name>admin</name></author>'
+                       '<title>Comment on Hello world!</title>'
+                       '<link rel="alternate" href="http://localhost/hello-world/"/>'
+                       '<id>http://localhost/?p=1#comment-1</id>'
+                       '<updated>2023-12-12T00:00:00Z</updated>'
+                       '<published>2023-12-12T00:00:00Z</published>'
+                       '<summary>Hi, this is a comment.</summary>'
+                       '<content>Hi, this is a comment.</content></entry></feed>')
+        elif path in ('/feed/atom', '/feed/atom/') or (
+                path in ('/', '/index.php')
+                and 'atom' in urllib.parse.parse_qs(query).get('feed', [])):
+            mime = 'application/atom+xml; charset=utf-8'
+            content = ('<?xml version="1.0" encoding="UTF-8"?>'
+                       '<feed xmlns="http://www.w3.org/2005/Atom">'
+                       '<title>My WordPress Blog</title>'
+                       '<subtitle>Just another WordPress site</subtitle>'
+                       '<updated>2023-12-12T00:00:00Z</updated>'
+                       '<link rel="alternate" href="http://localhost"/>'
+                       '<id>http://localhost/feed/atom/</id>'
+                       '<link rel="self" type="application/atom+xml" href="http://localhost/feed/atom/"/>'
+                       '<generator uri="https://wordpress.org/" version="6.4.2">WordPress</generator>'
+                       '<entry><author><name>admin</name></author>'
+                       '<title>Hello world!</title>'
+                       '<link rel="alternate" href="http://localhost/hello-world/"/>'
+                       '<id>http://localhost/?p=1</id>'
+                       '<updated>2023-12-12T00:00:00Z</updated>'
+                       '<published>2023-12-12T00:00:00Z</published>'
+                       '<category term="Uncategorized"/>'
+                       '<summary>Welcome to WordPress.</summary>'
+                       '<content>Welcome to WordPress.</content></entry></feed>')
+        elif path in ('/feed/rdf', '/feed/rdf/') or (
+                path in ('/', '/index.php')
+                and 'rdf' in urllib.parse.parse_qs(query).get('feed', [])):
+            mime = 'application/rss+xml; charset=utf-8'
+            content = ('<?xml version="1.0" encoding="UTF-8"?>'
+                       '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" '
+                       'xmlns="http://purl.org/rss/1.0/" '
+                       'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+                       '<channel rdf:about="http://localhost">'
+                       '<title>My WordPress Blog</title>'
+                       '<link>http://localhost</link>'
+                       '<description>Just another WordPress site</description>'
+                       '<items><rdf:Seq><rdf:li rdf:resource="http://localhost/?p=1"/>'
+                       '</rdf:Seq></items></channel>'
+                       '<item rdf:about="http://localhost/?p=1">'
+                       '<title>Hello world!</title><link>http://localhost/?p=1</link>'
+                       '<dc:date>2023-12-12T00:00:00Z</dc:date>'
+                       '<dc:creator>admin</dc:creator>'
+                       '<description>Welcome to WordPress.</description>'
+                       '</item></rdf:RDF>')
+        else:
+            mime = 'application/rss+xml; charset=utf-8'
+            content = ('<?xml version="1.0" encoding="UTF-8"?>'
+                       '<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">'
+                       '<channel><title>My WordPress Blog</title>'
+                       '<link>http://localhost</link>'
+                       '<description>Just another WordPress site</description>'
+                       '<language>en-US</language>'
+                       '<generator>https://wordpress.org/?v=6.4.2</generator>'
+                       '<lastBuildDate>Tue, 12 Dec 2023 00:00:00 +0000</lastBuildDate>'
+                       '<item><title>Hello world!</title>'
+                       '<link>http://localhost/?p=1</link>'
+                       '<guid>http://localhost/?p=1</guid>'
+                       '<pubDate>Tue, 12 Dec 2023 00:00:00 +0000</pubDate>'
+                       '<dc:creator>admin</dc:creator><category>Uncategorized</category>'
+                       '<description>Welcome to WordPress.</description>'
+                       '</item></channel></rss>')
     elif kind == 'author_probe':
         if path == '/':
             status, headers['Location'], content = 302, '/author/admin/', ''
@@ -280,6 +403,22 @@ def response(method, path, event):
         headers['Set-Cookie'] = 'wordpress_test_cookie=WP%20Cookie%20check; path=/'
     elif kind == 'page_xmlrpc':
         mime, content = 'text/plain; charset=utf-8', 'XML-RPC server accepts POST requests only.'
+        if (method in ('GET', 'HEAD') and path == '/xmlrpc.php'
+                and 'rsd' in urllib.parse.parse_qs(query, keep_blank_values=True)):
+            mime = 'text/xml; charset=utf-8'
+            content = ('<?xml version="1.0" encoding="UTF-8"?>'
+                       '<rsd version="1.0" xmlns="http://archipelago.phrasewise.com/rsd">\n'
+                       '<service>\n'
+                       '<engineName>WordPress</engineName>\n'
+                       '<engineLink>https://wordpress.org/</engineLink>\n'
+                       '<homePageLink>http://localhost</homePageLink>\n'
+                       '<apis>\n'
+                       '<api name="WordPress" blogID="1" preferred="true" apiLink="http://localhost/xmlrpc.php" />\n'
+                       '<api name="Movable Type" blogID="1" preferred="false" apiLink="http://localhost/xmlrpc.php" />\n'
+                       '<api name="MetaWeblog" blogID="1" preferred="false" apiLink="http://localhost/xmlrpc.php" />\n'
+                       '<api name="Blogger" blogID="1" preferred="false" apiLink="http://localhost/xmlrpc.php" />\n'
+                       '<api name="WP-API" blogID="1" preferred="false" apiLink="http://localhost/wp-json/" />\n'
+                       '</apis>\n</service>\n</rsd>')
     elif kind == 'xmlrpc':
         mime = 'text/xml; charset=utf-8'
         content = '<?xml version="1.0"?><methodResponse><fault><value><struct><member><name>faultCode</name><value><int>403</int></value></member><member><name>faultString</name><value><string>Incorrect username or password.</string></value></member></struct></value></fault></methodResponse>'
@@ -328,6 +467,14 @@ def response(method, path, event):
                 '/wp/v2/' + route: {'methods': ['GET']} for route in (
                     'users', 'posts', 'pages', 'types', 'categories', 'comments',
                     'settings', 'themes', 'plugins')}}
+            target = path
+            if path in ('/', '/index.php'):
+                params = urllib.parse.parse_qs(query, keep_blank_values=True)
+                if 'rest_route' in params:
+                    target = '/wp-json/' + params['rest_route'][0].strip('/')
+            if target in ('/wp-json/wp/v2', '/wp-json/wp/v2/'):
+                data = {'namespace': 'wp/v2', 'routes': data['routes'],
+                        '_links': {'self': [{'href': '/wp-json/wp/v2/'}]}}
         elif kind == 'rest_users':
             data = [{'id': 1, 'name': 'admin', 'slug': 'admin', 'link': '/author/admin/', 'avatar_urls': {'96': '/wp-content/uploads/avatar.png'}, '_links': {'self': [{'href': '/wp-json/wp/v2/users/1'}]}}]
         elif kind == 'rest_posts':
@@ -352,7 +499,47 @@ def response(method, path, event):
             data = {'code': 'rest_forbidden_context',
                     'message': 'Sorry, you are not allowed to do that.',
                     'data': {'status': 401}}
+        single_paths = {
+            'rest_posts': '/wp-json/wp/v2/posts/1',
+            'rest_pages': '/wp-json/wp/v2/pages/2',
+            'rest_users': '/wp-json/wp/v2/users/1',
+            'rest_categories': '/wp-json/wp/v2/categories/1',
+            'rest_comments': '/wp-json/wp/v2/comments/1'}
+        target = path
+        if path in ('/', '/index.php'):
+            params = urllib.parse.parse_qs(query, keep_blank_values=True)
+            if 'rest_route' in params:
+                target = '/wp-json/' + params['rest_route'][0].strip('/')
+        if kind in single_paths and target == single_paths[kind]:
+            data = data[0]
+        elif kind in single_paths and re.fullmatch(
+                r'/wp-json/wp/v2/(posts|pages|users|categories|comments)/[0-9]+', target):
+            status = 404
+            code, message = {
+                'rest_posts': ('rest_post_invalid_id', 'Invalid post ID.'),
+                'rest_pages': ('rest_post_invalid_id', 'Invalid post ID.'),
+                'rest_users': ('rest_user_invalid_id', 'Invalid user ID.'),
+                'rest_categories': ('rest_term_invalid', "Term doesn't exist."),
+                'rest_comments': ('rest_comment_invalid_id', 'Invalid comment ID.'),
+            }[kind]
+            data = {'code': code, 'message': message, 'data': {'status': 404}}
+        elif kind == 'rest_types' and target in (
+                '/wp-json/wp/v2/types/post', '/wp-json/wp/v2/types/page'):
+            data = data[target.rsplit('/', 1)[-1]]
+        elif kind == 'rest_types' and re.fullmatch(
+                r'/wp-json/wp/v2/types/([a-z0-9_-]+)', target):
+            status = 404
+            data = {'code': 'rest_type_invalid', 'message': 'Invalid post type.',
+                    'data': {'status': 404}}
         content = json.dumps(data)
+    elif path == '/wp-admin/admin-ajax.php' and method in ('GET', 'HEAD', 'POST'):
+        content = '0'
+    elif method == 'OPTIONS' and path == '/':
+        status, headers['Allow'], content = 200, 'GET, POST, OPTIONS, HEAD', ''
+    elif method == 'TRACE' and path == '/':
+        status, headers['Allow'], content = 405, 'GET, POST, OPTIONS, HEAD', ''
+    elif method == 'PROPFIND' and path == '/':
+        status, headers['Allow'], content = 405, 'GET, POST, OPTIONS, HEAD', ''
     elif kind == 'admin_probe':
         status, headers['Location'], content = 302, '/wp-login.php', ''
     elif kind == 'plugin_probe' and path.rsplit('/', 1)[-1].lower() == 'readme.txt':
@@ -385,8 +572,187 @@ def response(method, path, event):
         mime = 'application/javascript'
         content = ('/* jQuery v3.7.1 - synthetic decoy stub */\n'
                    'window.jQuery = {version: "3.7.1"};\n')
+    elif path == '/wp-includes/js/jquery/jquery-migrate.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for jquery-migrate */\n'
+                   'window.jQueryMigrate = {};\n')
+    elif path == '/wp-includes/js/jquery/jquery.min.js.map' and method in ('GET', 'HEAD'):
+        mime = 'application/json'
+        content = json.dumps({'version': 3, 'file': 'jquery.min.js',
+                              'sources': ['jquery-3.7.1.js'], 'names': [], 'mappings': ''})
+    elif path == '/wp-includes/js/wp-embed.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-embed */\n'
+                   'window.wp = window.wp || {};\n')
+    elif path == '/wp-includes/js/wp-emoji-release.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-emoji-release */\n'
+                   'window.wpEmoji = {};\n')
+    elif path == '/wp-includes/js/comment-reply.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for comment-reply */\n'
+                   'window.commentReply = {};\n')
+    elif path == '/wp-includes/js/underscore.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for underscore */\n'
+                   'window._ = {};\n')
+    elif path == '/wp-includes/js/backbone.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for backbone */\n'
+                   'window.Backbone = {};\n')
+    elif path == '/wp-includes/js/wp-util.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-util */\n'
+                   'window.wpUtil = {};\n')
+    elif path == '/wp-includes/js/wp-api.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-api */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.api = {};\n')
+    elif path == '/wp-includes/js/api-request.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for api-request */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.apiRequest = {};\n')
+    elif path == '/wp-includes/js/heartbeat.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for heartbeat */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.heartbeat = {};\n')
+    elif path == '/wp-includes/js/wp-backbone.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-backbone */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.Backbone = {};\n')
+    elif path == '/wp-includes/js/wp-a11y.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-a11y */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.a11y = {};\n')
+    elif path == '/wp-includes/js/imagesloaded.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for imagesloaded */\n'
+                   'window.imagesLoaded = {};\n')
+    elif path == '/wp-includes/js/masonry.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for masonry */\n'
+                   'window.Masonry = {};\n')
+    elif path == '/wp-includes/js/hoverIntent.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for hoverIntent */\n'
+                   'window.hoverIntent = {};\n')
+    elif path == '/wp-includes/js/wp-pointer.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-pointer */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.pointer = {};\n')
+    elif path == '/wp-includes/js/shortcode.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for shortcode */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.shortcode = {};\n')
+    elif path == '/wp-includes/js/wp-lists.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-lists */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.lists = {};\n')
+    elif path == '/wp-includes/js/wp-ajax-response.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-ajax-response */\n'
+                   'window.wpAjax = {};\n')
+    elif path == '/wp-includes/js/wp-sanitize.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-sanitize */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.sanitize = {};\n')
+    elif path == '/wp-includes/js/utils.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for utils */\n'
+                   'window.userSettings = {};\n')
+    elif path == '/wp-includes/js/admin-bar.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for admin-bar */\n'
+                   'window.wpAdminBar = {};\n')
+    elif path == '/wp-includes/js/zxcvbn-async.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for zxcvbn-async */\n'
+                   'window.zxcvbnAsync = {};\n')
+    elif path == '/wp-includes/js/wp-auth-check.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-auth-check */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.authCheck = {};\n')
+    elif path == '/wp-includes/js/wplink.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wplink */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wpLink = {};\n')
+    elif path == '/wp-includes/js/clipboard.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for clipboard */\n'
+                   'window.ClipboardJS = {};\n')
+    elif path == '/wp-includes/js/quicktags.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for quicktags */\n'
+                   'window.QTags = {};\n')
+    elif path == '/wp-includes/wlwmanifest.xml' and method in ('GET', 'HEAD'):
+        mime = 'application/xml; charset=utf-8'
+        content = ('<?xml version="1.0" encoding="utf-8" ?>\n'
+                   '<manifest xmlns="http://schemas.microsoft.com/wlw/manifest/weblog">\n'
+                   '<options>\n'
+                   '<clientType>WordPress</clientType>\n'
+                   '<supportsKeywords>Yes</supportsKeywords>\n'
+                   '<supportsGetTags>Yes</supportsGetTags>\n'
+                   '<supportsNewCategories>Yes</supportsNewCategories>\n'
+                   '<supportsNewCategoriesInline>Yes</supportsNewCategoriesInline>\n'
+                   '<supportsCommentPolicy>Yes</supportsCommentPolicy>\n'
+                   '<supportsSlug>Yes</supportsSlug>\n'
+                   '<supportsExcerpt>Yes</supportsExcerpt>\n'
+                   '<supportsPages>Yes</supportsPages>\n'
+                   '<supportsPageParent>Yes</supportsPageParent>\n'
+                   '<supportsAuthor>Yes</supportsAuthor>\n'
+                   '<supportsCustomDate>Yes</supportsCustomDate>\n'
+                   '<supportsFeaturedImage>Yes</supportsFeaturedImage>\n'
+                   '<supportsPostAsDraft>Yes</supportsPostAsDraft>\n'
+                   '<supportsCustomFields>Yes</supportsCustomFields>\n'
+                   '<supportsTrackbacks>Yes</supportsTrackbacks>\n'
+                   '</options>\n'
+                   '</manifest>\n')
     elif path == '/robots.txt' and method in ('GET', 'HEAD'):
         mime, content = 'text/plain; charset=utf-8', 'User-agent: *\nDisallow: /wp-admin/\nAllow: /wp-admin/admin-ajax.php\n'
+    elif path == '/hello-world/' and method in ('GET', 'HEAD'):
+        content = page('<article><h2>Hello world!</h2><p>Welcome to WordPress.</p></article>')
+    elif path == '/sample-page/' and method in ('GET', 'HEAD'):
+        content = page('<article><h2>Sample Page</h2><p>This is an example page.</p></article>')
+    elif path == '/category/uncategorized/' and method in ('GET', 'HEAD'):
+        content = page('<h1>Category: Uncategorized</h1><article><h2>Hello world!</h2><p>Welcome to WordPress.</p></article>')
+    elif path == '/sitemap.xml' and method in ('GET', 'HEAD'):
+        status, headers['Location'], content = 302, '/wp-sitemap.xml', ''
+    elif path == '/wp-sitemap.xml' and method in ('GET', 'HEAD'):
+        mime = 'text/xml; charset=utf-8'
+        content = ('<?xml version="1.0" encoding="UTF-8"?>'
+                   '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                   '<sitemap><loc>http://localhost/wp-sitemap-posts-post-1.xml</loc>'
+                   '<lastmod>2023-12-12T00:00:00+00:00</lastmod></sitemap>'
+                   '<sitemap><loc>http://localhost/wp-sitemap-posts-page-1.xml</loc>'
+                   '<lastmod>2023-12-12T00:00:00+00:00</lastmod></sitemap>'
+                   '<sitemap><loc>http://localhost/wp-sitemap-taxonomies-category-1.xml</loc>'
+                   '<lastmod>2023-12-12T00:00:00+00:00</lastmod></sitemap>'
+                   '<sitemap><loc>http://localhost/wp-sitemap-users-1.xml</loc>'
+                   '<lastmod>2023-12-12T00:00:00+00:00</lastmod></sitemap>'
+                   '</sitemapindex>')
+    elif path in ('/wp-sitemap-posts-post-1.xml', '/wp-sitemap-posts-page-1.xml',
+                  '/wp-sitemap-taxonomies-category-1.xml', '/wp-sitemap-users-1.xml') and method in ('GET', 'HEAD'):
+        loc = {'/wp-sitemap-posts-post-1.xml': 'http://localhost/hello-world/',
+               '/wp-sitemap-posts-page-1.xml': 'http://localhost/sample-page/',
+               '/wp-sitemap-taxonomies-category-1.xml': 'http://localhost/category/uncategorized/',
+               '/wp-sitemap-users-1.xml': 'http://localhost/author/admin/'}[path]
+        mime = 'text/xml; charset=utf-8'
+        content = ('<?xml version="1.0" encoding="UTF-8"?>'
+                   '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                   '<url><loc>' + loc + '</loc>'
+                   '<lastmod>2023-12-12T00:00:00+00:00</lastmod></url>'
+                   '</urlset>')
     elif path in ('/.well-known/security.txt', '/security.txt') and method in ('GET', 'HEAD'):
         mime = 'text/plain; charset=utf-8'
         content = ('Contact: mailto:security@example.com\n'
@@ -421,6 +787,46 @@ def response(method, path, event):
                    'See the GNU General Public License for more details.\n')
     elif path == '/wp-cron.php' and method in ('GET', 'HEAD'):
         content = ''
+    elif path == '/wp-includes/version.php' and method in ('GET', 'HEAD'):
+        content = ''
+    elif path == '/wp-includes/load.php' and method in ('GET', 'HEAD'):
+        content = ''
+    elif path == '/config.php' and method in ('GET', 'HEAD'):
+        content = ''
+    elif path == '/admin/config.php' and method in ('GET', 'HEAD'):
+        content = ''
+    elif path == '/config.dev.php' and method in ('GET', 'HEAD'):
+        content = ''
+    elif path == '/debug.php' and method in ('GET', 'HEAD'):
+        content = '<!doctype html><html><head><title>Debug</title></head><body><h1>Debug</h1><table><tr><th>PHP Version</th><td>8.1.2</td></tr><tr><th>Server API</th><td>Apache 2.4.52 (Ubuntu)</td></tr><tr><th>DOCUMENT_ROOT</th><td>/var/www/html</td></tr></table></body></html>'
+    elif path == '/server-status' and method in ('GET', 'HEAD'):
+        status = 403
+        content = ''
+    elif path == '/wp-content/' and method in ('GET', 'HEAD'):
+        content = ''
+    elif path == '/wp-content/themes/' and method in ('GET', 'HEAD'):
+        content = ''
+    elif path == '/wp-content/themes/twentytwentyfour/' and method in ('GET', 'HEAD'):
+        status = 403
+        content = ''
+    elif path == '/wp-content/plugins/' and method in ('GET', 'HEAD'):
+        content = ''
+    elif path == '/wp-content/uploads/' and method in ('GET', 'HEAD'):
+        status = 403
+        content = ''
+    elif path == '/wp-includes/' and method in ('GET', 'HEAD'):
+        status = 403
+        content = ''
+    elif path == '/wp-includes/js/' and method in ('GET', 'HEAD'):
+        status = 403
+        content = ''
+    elif path == '/wp-includes/js/jquery/' and method in ('GET', 'HEAD'):
+        status = 403
+        content = ''
+    elif path == '/wp-content/uploads/avatar.png' and method in ('GET', 'HEAD'):
+        mime = 'image/png'
+        content = base64.b64decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=')
     elif path == '/favicon.ico' and method in ('GET', 'HEAD'):
         mime = 'image/x-icon'
         # ICO container with one synthetic transparent 1x1 PNG.
@@ -557,6 +963,14 @@ def response(method, path, event):
                     },
                 },
             })
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in YARN_LOCK_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('# yarn lockfile v1\n'
+                       '# Synthetic decoy lockfile\n\n'
+                       '"express@^4.18.2":\n'
+                       '  version "4.18.2"\n'
+                       '  resolved "synthetic-decoy-resolved-not-real"\n'
+                       '  integrity synthetic-decoy-integrity-not-real\n')
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in COMPOSER_CONFIG_NAMES:
             mime = 'application/json; charset=utf-8'
             content = json.dumps({
@@ -583,6 +997,25 @@ def response(method, path, event):
                 'api_key': 'synthetic-decoy-api-key-not-real',
                 'secret_key': 'synthetic-decoy-secret-key-not-real',
             })
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in GOOGLE_SERVICES_NAMES:
+            mime = 'application/json; charset=utf-8'
+            content = json.dumps({
+                'project_info': {
+                    'project_number': '123456789012',
+                    'project_id': 'synthetic-decoy-project',
+                    'storage_bucket': 'synthetic-decoy-project.appspot.com',
+                },
+                'client': [{
+                    'client_info': {
+                        'mobilesdk_app_id': 'synthetic-decoy-app-id-not-real',
+                        'android_client_info': {'package_name': 'com.example.wordpress'},
+                    },
+                    'oauth_client': [],
+                    'api_key': [{'current_key': 'synthetic-decoy-api-key-not-real'}],
+                    'services': {'appinvite_service': {'other_platform_oauth_client': []}},
+                }],
+                'configuration_version': '1',
+            })
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in SECRETS_JSON_NAMES:
             mime = 'application/json; charset=utf-8'
             content = json.dumps({
@@ -600,6 +1033,103 @@ def response(method, path, event):
                        '</database><api_key>synthetic-decoy-api-key-not-real</api_key>'
                        '<secret_key>synthetic-decoy-secret-key-not-real</secret_key>'
                        '</credentials>\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in REQUIREMENTS_TXT_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('Django==4.2.7\n'
+                       'mysqlclient==2.2.0\n'
+                       'gunicorn==21.2.0\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in SETTINGS_PY_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('# Synthetic decoy settings; no real credentials\n'
+                       'DEBUG = False\n'
+                       "ALLOWED_HOSTS = ['localhost']\n"
+                       "SECRET_KEY = 'synthetic-decoy-secret-key-not-real'\n"
+                       'DATABASES = {\n'
+                       "    'default': {\n"
+                       "        'ENGINE': 'django.db.backends.mysql',\n"
+                       "        'NAME': 'wordpress',\n"
+                       "        'USER': 'wp_user',\n"
+                       "        'HOST': 'localhost',\n"
+                       "        'PASSWORD': 'synthetic-decoy-password-not-real',\n"
+                       '    },\n'
+                       '}\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in CROSSDOMAIN_XML_NAMES:
+            mime = 'application/xml'
+            content = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+                       '<cross-domain-policy>\n'
+                       '<site-control permitted-cross-domain-policies="all"/>\n'
+                       '<allow-access-from domain="*" secure="false"/>\n'
+                       '</cross-domain-policy>\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in README_MD_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('# WordPress Site\n'
+                       '\n'
+                       'A WordPress site and blog.\n'
+                       '\n'
+                       '## Installation\n'
+                       'Install WordPress 6.4.2 and follow the installation wizard.\n'
+                       '\n'
+                       '## Requirements\n'
+                       '- PHP 7.4+\n'
+                       '- MySQL 5.7+\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in TERRAFORM_TFSTATE_NAMES:
+            mime = 'application/json'
+            content = json.dumps({
+                'version': 4,
+                'terraform_version': '1.5.7',
+                'serial': 1,
+                'lineage': 'synthetic-decoy-lineage-not-real',
+                'outputs': {},
+                'resources': [],
+            })
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in DATABASE_CONFIG_NAMES:
+            mime = 'application/xml; charset=utf-8'
+            content = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+                       '<configuration><connectionStrings>'
+                       '<add name="WordPress" connectionString="Server=localhost;Database=wordpress;'
+                       'User Id=wp_user;Password=synthetic-decoy-password-not-real" />'
+                       '</connectionStrings><appSettings>'
+                       '<add key="api_key" value="synthetic-decoy-api-key-not-real" />'
+                       '<add key="secret" value="synthetic-decoy-secret-not-real" />'
+                       '</appSettings></configuration>\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in WEB_CONFIG_NAMES:
+            mime = 'application/xml; charset=utf-8'
+            content = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+                       '<configuration><connectionStrings>'
+                       '<add name="WordPress" connectionString="Server=localhost;Database=wordpress;'
+                       'User Id=wp_user;Password=synthetic-decoy-password-not-real" />'
+                       '</connectionStrings><appSettings>'
+                       '<add key="ApiKey" value="synthetic-decoy-api-key-not-real" />'
+                       '<add key="SecretKey" value="synthetic-decoy-secret-key-not-real" />'
+                       '</appSettings></configuration>\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in CONFIGURATION_NAMES:
+            if lower.endswith('.json'):
+                mime = 'application/json; charset=utf-8'
+                content = json.dumps({
+                    'database': {'host': 'localhost', 'name': 'wordpress', 'user': 'wp_user',
+                                 'password': 'synthetic-decoy-password-not-real'},
+                    'api_key': 'synthetic-decoy-api-key-not-real',
+                    'secret_key': 'synthetic-decoy-secret-key-not-real',
+                })
+            elif lower.endswith('.xml'):
+                mime = 'application/xml; charset=utf-8'
+                content = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+                           '<configuration><database><host>localhost</host>'
+                           '<name>wordpress</name><user>wp_user</user>'
+                           '<password>synthetic-decoy-password-not-real</password>'
+                           '</database><api_key>synthetic-decoy-api-key-not-real</api_key>'
+                           '<secret_key>synthetic-decoy-secret-key-not-real</secret_key>'
+                           '</configuration>\n')
+            else:
+                mime = 'text/plain; charset=utf-8'
+                content = ('# Synthetic decoy configuration; no real credentials\n'
+                           'database:\n'
+                           '  host: localhost\n'
+                           '  name: wordpress\n'
+                           '  user: wp_user\n'
+                           '  password: synthetic-decoy-password-not-real\n'
+                           'api_key: synthetic-decoy-api-key-not-real\n'
+                           'secret_key: synthetic-decoy-secret-key-not-real\n')
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in CREDENTIALS_INI_NAMES:
             mime = 'text/plain; charset=utf-8'
             content = ('[database]\n'
@@ -616,6 +1146,24 @@ def response(method, path, event):
             content = ('[default]\n'
                        'region = us-east-1\n'
                        'output = json\n')
+        elif kind == 'exploit_probe' and lower == '/.kube/config':
+            mime = 'text/plain; charset=utf-8'
+            content = ('apiVersion: v1\n'
+                       'kind: Config\n'
+                       'clusters:\n'
+                       '- cluster:\n'
+                       '    server: https://localhost:6443\n'
+                       '  name: synthetic-decoy-cluster\n'
+                       'contexts:\n'
+                       '- context:\n'
+                       '    cluster: synthetic-decoy-cluster\n'
+                       '    user: synthetic-decoy-user\n'
+                       '  name: synthetic-decoy-context\n'
+                       'current-context: synthetic-decoy-context\n'
+                       'users:\n'
+                       '- name: synthetic-decoy-user\n'
+                       '  user:\n'
+                       '    token: synthetic-decoy-token-not-real\n')
         elif kind == 'exploit_probe' and lower == '/.aws/credentials':
             mime = 'text/plain; charset=utf-8'
             content = ('[default]\n'
@@ -710,6 +1258,14 @@ def response(method, path, event):
                        'server:\n'
                        '  port: 8080\n'
                        'api_key: synthetic-decoy-api-key-not-real\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in APPLICATION_PROPERTIES_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('# Synthetic decoy Spring Boot configuration; no real credentials\n'
+                       'spring.datasource.url=jdbc:mysql://localhost:3306/wordpress\n'
+                       'spring.datasource.username=wp_user\n'
+                       'spring.datasource.password=synthetic-decoy-password-not-real\n'
+                       'server.port=8080\n'
+                       'api_key=synthetic-decoy-api-key-not-real\n')
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in CONFIG_INI_NAMES:
             mime = 'text/plain; charset=utf-8'
             content = ('[app]\n'
@@ -732,6 +1288,42 @@ def response(method, path, event):
                        "  apiKey: 'synthetic-decoy-api-key-not-real',\n"
                        "  sessionSecret: 'synthetic-decoy-session-secret-not-real'\n"
                        '};\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in GITLAB_CI_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('# Synthetic decoy GitLab CI configuration; no real credentials\n'
+                       'stages:\n'
+                       '  - build\n'
+                       '  - test\n'
+                       '  - deploy\n'
+                       'variables:\n'
+                       '  DB_HOST: localhost\n'
+                       '  DB_NAME: wordpress\n'
+                       '  DB_USER: wp_user\n'
+                       '  DB_PASSWORD: synthetic-decoy-password-not-real\n'
+                       '  DEPLOY_TOKEN: synthetic-decoy-deploy-token-not-real\n'
+                       'build:\n'
+                       '  stage: build\n'
+                       '  script:\n'
+                       '    - echo "Synthetic decoy build"\n'
+                       'test:\n'
+                       '  stage: test\n'
+                       '  script:\n'
+                       '    - echo "Synthetic decoy test"\n'
+                       'deploy:\n'
+                       '  stage: deploy\n'
+                       '  script:\n'
+                       '    - echo "Synthetic decoy deploy"\n')
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in DOCKERFILE_NAMES:
+            mime = 'text/plain; charset=utf-8'
+            content = ('# Synthetic decoy Dockerfile; no real credentials\n'
+                       'FROM wordpress:6.4.2-apache\n'
+                       'WORKDIR /var/www/html\n'
+                       'COPY . /var/www/html/\n'
+                       'EXPOSE 80\n'
+                       'ENV WORDPRESS_DB_HOST=localhost\n'
+                       'ENV WORDPRESS_DB_NAME=wordpress\n'
+                       'ENV WORDPRESS_DB_USER=wp_user\n'
+                       'ENV WORDPRESS_DB_PASSWORD=synthetic-decoy-password-not-real\n')
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in COMPOSE_CONFIG_NAMES:
             mime = 'text/plain; charset=utf-8'
             content = ('# Synthetic decoy configuration; no real credentials\n'
@@ -823,7 +1415,7 @@ class Handler(BaseHTTPRequestHandler):
         decoded = body.decode('utf-8', errors='replace')
         path, _, query = self.path.partition('?')
         event = classify(self.command, path, query, self.headers, decoded)
-        status, mime, headers, payload = response(self.command, path, event)
+        status, mime, headers, payload = response(self.command, path, event, query)
         record = {'ts': dt.datetime.now().astimezone().isoformat(),
                   'src_ip': self.client_address[0], 'method': self.command,
                   'path': path, 'query': query, 'user_agent': self.headers.get('User-Agent', ''),
