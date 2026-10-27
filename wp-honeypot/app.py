@@ -629,6 +629,10 @@ def response(method, path, event, query=''):
         mime = 'application/javascript'
         content = ('/* Synthetic decoy stub for wp-emoji-release */\n'
                    'window.wpEmoji = {};\n')
+    elif path == '/wp-includes/js/wp-emoji-loader.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-emoji-loader */\n'
+                   'window.wpEmojiLoader = {};\n')
     elif path == '/wp-includes/js/comment-reply.min.js' and method in ('GET', 'HEAD'):
         mime = 'application/javascript'
         content = ('/* Synthetic decoy stub for comment-reply */\n'
