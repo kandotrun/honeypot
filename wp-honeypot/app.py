@@ -695,6 +695,14 @@ def response(method, path, event, query=''):
         mime = 'application/javascript'
         content = ('/* Synthetic decoy stub for quicktags */\n'
                    'window.QTags = {};\n')
+    elif path == '/wp-includes/js/zxcvbn.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for zxcvbn */\n'
+                   'window.zxcvbn = {};\n')
+    elif path == '/wp-includes/js/tw-sack.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for tw-sack */\n'
+                   'window.twSack = {};\n')
     elif path == '/wp-includes/wlwmanifest.xml' and method in ('GET', 'HEAD'):
         mime = 'application/xml; charset=utf-8'
         content = ('<?xml version="1.0" encoding="utf-8" ?>\n'
