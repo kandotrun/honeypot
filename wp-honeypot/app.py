@@ -535,6 +535,11 @@ def response(method, path, event, query=''):
         content = json.dumps(data)
     elif path == '/wp-admin/admin-ajax.php' and method in ('GET', 'HEAD', 'POST'):
         content = '0'
+    elif path == '/wp-admin/js/password-strength-meter.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for password-strength-meter */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.passwordStrength = {};\n')
     elif method == 'OPTIONS' and path == '/':
         status, headers['Allow'], content = 200, 'GET, POST, OPTIONS, HEAD', ''
     elif method == 'TRACE' and path == '/':
