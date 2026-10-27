@@ -42,6 +42,7 @@ COMPOSER_CONFIG_NAMES = ('composer.json',)
 CLIENT_SECRETS_NAMES = ('client_secrets.json',)
 CREDENTIALS_CONFIG_NAMES = ('credentials.json',)
 GOOGLE_SERVICES_NAMES = ('google-services.json',)
+GCP_SERVICE_ACCOUNT_NAMES = ('service-account.json', 'sa.json', 'gcp-key.json', 'gcp-credentials.json', 'gcp-sa.json', 'google-credentials.json', 'google-key.json', 'application_default_credentials.json', 'key.json', 'keyfile.json', 'firebase-adminsdk.json', 'firebase-key.json')
 SECRETS_JSON_NAMES = ('secrets.json', 'env.json')
 CREDENTIALS_XML_NAMES = ('credentials.xml',)
 CONFIGURATION_NAMES = ('configuration.yaml', 'configuration.xml', 'configuration.json')
@@ -151,7 +152,7 @@ def classify(method, path, query, headers, body):
     if any(s in lower for s in ('.env', 'wp-config.php', 'phpinfo', 'eval-stdin.php',
                                 'thinkphp', '/vendor/phpunit', 'shell', '.git/')) or lower in ('/.aws/credentials', '/.aws/config', '/.kube/config') or (
             '/wp-content/uploads' in lower and 'upload' in lower) or (
-            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + CONFIG_JS_NAMES + PARAMETERS_YML_NAMES + AWS_YML_NAMES + DATABASE_YML_NAMES + APPLICATION_YML_NAMES + APPLICATION_PROPERTIES_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + PACKAGE_LOCK_NAMES + YARN_LOCK_NAMES + COMPOSER_CONFIG_NAMES + CLIENT_SECRETS_NAMES + CREDENTIALS_CONFIG_NAMES + GOOGLE_SERVICES_NAMES + SECRETS_JSON_NAMES + CREDENTIALS_XML_NAMES + CONFIGURATION_NAMES + WEB_CONFIG_NAMES + DATABASE_CONFIG_NAMES + TERRAFORM_TFSTATE_NAMES + README_MD_NAMES + CROSSDOMAIN_XML_NAMES + SETTINGS_PY_NAMES + REQUIREMENTS_TXT_NAMES + CREDENTIALS_INI_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + SQL_DUMP_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + APP_LOG_NAMES + SITE_ARCHIVE_NAMES + GITLAB_CI_NAMES + DOCKERFILE_NAMES):
+            lower.rsplit('/', 1)[-1] in CONFIG_BACKUP_NAMES + JSON_CONFIG_NAMES + COMPOSE_CONFIG_NAMES + SECRETS_CONFIG_NAMES + CONFIG_YAML_NAMES + CONFIG_INI_NAMES + CONFIG_JS_NAMES + PARAMETERS_YML_NAMES + AWS_YML_NAMES + DATABASE_YML_NAMES + APPLICATION_YML_NAMES + APPLICATION_PROPERTIES_NAMES + ENV_EXAMPLE_NAMES + PACKAGE_CONFIG_NAMES + PACKAGE_LOCK_NAMES + YARN_LOCK_NAMES + COMPOSER_CONFIG_NAMES + CLIENT_SECRETS_NAMES + CREDENTIALS_CONFIG_NAMES + GOOGLE_SERVICES_NAMES + GCP_SERVICE_ACCOUNT_NAMES + SECRETS_JSON_NAMES + CREDENTIALS_XML_NAMES + CONFIGURATION_NAMES + WEB_CONFIG_NAMES + DATABASE_CONFIG_NAMES + TERRAFORM_TFSTATE_NAMES + README_MD_NAMES + CROSSDOMAIN_XML_NAMES + SETTINGS_PY_NAMES + REQUIREMENTS_TXT_NAMES + CREDENTIALS_INI_NAMES + COMPOSER_LOCK_NAMES + DEBUG_LOG_NAMES + SQL_DUMP_NAMES + ERROR_LOG_NAMES + LARAVEL_LOG_NAMES + APP_LOG_NAMES + SITE_ARCHIVE_NAMES + GITLAB_CI_NAMES + DOCKERFILE_NAMES):
         return {'event': 'exploit_probe'}
     if (path == '/wp-login.php' and method in ('GET', 'HEAD', 'POST')
             and urllib.parse.parse_qs(query).get('action', [''])[0] == 'lostpassword'):
@@ -1074,6 +1075,21 @@ def response(method, path, event, query=''):
                     'services': {'appinvite_service': {'other_platform_oauth_client': []}},
                 }],
                 'configuration_version': '1',
+            })
+        elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in GCP_SERVICE_ACCOUNT_NAMES:
+            mime = 'application/json; charset=utf-8'
+            content = json.dumps({
+                'type': 'service_account',
+                'project_id': 'synthetic-decoy-project',
+                'private_key_id': 'synthetic-decoy-private-key-id-not-real',
+                'private_key': 'synthetic-decoy-private-key-not-real',
+                'client_email': 'synthetic-decoy@synthetic-decoy-project.iam.gserviceaccount.com',
+                'client_id': 'synthetic-decoy-client-id-not-real',
+                'auth_uri': 'https://accounts.google.com/o/oauth2/auth',
+                'token_uri': 'https://oauth2.googleapis.com/token',
+                'auth_provider_x509_cert_url': 'https://www.googleapis.com/oauth2/v1/certs',
+                'client_x509_cert_url': 'https://www.googleapis.com/robot/v1/metadata/x509/synthetic-decoy%40synthetic-decoy-project.iam.gserviceaccount.com',
+                'universe_domain': 'googleapis.com',
             })
         elif kind == 'exploit_probe' and lower.rsplit('/', 1)[-1] in SECRETS_JSON_NAMES:
             mime = 'application/json; charset=utf-8'
