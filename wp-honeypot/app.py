@@ -742,6 +742,10 @@ def response(method, path, event, query=''):
         mime = 'application/javascript'
         content = ('/* Synthetic decoy stub for mediaelement-dailymotion */\n'
                    'window.MediaElementDailymotion = {};\n')
+    elif path == '/wp-includes/js/mediaelement/renderers/facebook.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for mediaelement-facebook */\n'
+                   'window.MediaElementFacebook = {};\n')
     elif path == '/wp-includes/wlwmanifest.xml' and method in ('GET', 'HEAD'):
         mime = 'application/xml; charset=utf-8'
         content = ('<?xml version="1.0" encoding="utf-8" ?>\n'
