@@ -565,6 +565,11 @@ def response(method, path, event, query=''):
         content = ('/* Synthetic decoy stub for dashboard */\n'
                    'window.wp = window.wp || {};\n'
                    'window.wp.dashboard = {};\n')
+    elif path == '/wp-admin/js/editor.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for editor */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.editor = {};\n')
     elif method == 'OPTIONS' and path == '/':
         status, headers['Allow'], content = 200, 'GET, POST, OPTIONS, HEAD', ''
     elif method == 'TRACE' and path == '/':
