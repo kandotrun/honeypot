@@ -708,6 +708,11 @@ def response(method, path, event, query=''):
         content = ('/* Synthetic decoy stub for customize-base */\n'
                    'window.wp = window.wp || {};\n'
                    'window.wp.customize = {};\n')
+    elif path == '/wp-includes/js/autosave.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for autosave */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.autosave = {};\n')
     elif path == '/wp-includes/wlwmanifest.xml' and method in ('GET', 'HEAD'):
         mime = 'application/xml; charset=utf-8'
         content = ('<?xml version="1.0" encoding="utf-8" ?>\n'
