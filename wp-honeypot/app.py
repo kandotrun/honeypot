@@ -750,6 +750,10 @@ def response(method, path, event, query=''):
         mime = 'application/javascript'
         content = ('/* Synthetic decoy stub for mediaelement-soundcloud */\n'
                    'window.MediaElementSoundcloud = {};\n')
+    elif path == '/wp-includes/js/mediaelement/renderers/twitch.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for mediaelement-twitch */\n'
+                   'window.MediaElementTwitch = {};\n')
     elif path == '/wp-includes/wlwmanifest.xml' and method in ('GET', 'HEAD'):
         mime = 'application/xml; charset=utf-8'
         content = ('<?xml version="1.0" encoding="utf-8" ?>\n'
