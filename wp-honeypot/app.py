@@ -676,6 +676,12 @@ def response(method, path, event, query=''):
                    'window.jQuery = window.jQuery || {};\n'
                    'window.jQuery.ui = window.jQuery.ui || {};\n'
                    'window.jQuery.ui.button = {};\n')
+    elif path == '/wp-includes/js/jquery/ui/checkboxradio.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for jquery-ui-checkboxradio */\n'
+                   'window.jQuery = window.jQuery || {};\n'
+                   'window.jQuery.ui = window.jQuery.ui || {};\n'
+                   'window.jQuery.ui.checkboxradio = {};\n')
     elif path == '/wp-includes/js/jquery/jquery.min.js.map' and method in ('GET', 'HEAD'):
         mime = 'application/json'
         content = json.dumps({'version': 3, 'file': 'jquery.min.js',
