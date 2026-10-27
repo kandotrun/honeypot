@@ -664,6 +664,12 @@ def response(method, path, event, query=''):
                    'window.jQuery = window.jQuery || {};\n'
                    'window.jQuery.ui = window.jQuery.ui || {};\n'
                    'window.jQuery.ui.droppable = {};\n')
+    elif path == '/wp-includes/js/jquery/ui/dialog.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for jquery-ui-dialog */\n'
+                   'window.jQuery = window.jQuery || {};\n'
+                   'window.jQuery.ui = window.jQuery.ui || {};\n'
+                   'window.jQuery.ui.dialog = {};\n')
     elif path == '/wp-includes/js/jquery/jquery.min.js.map' and method in ('GET', 'HEAD'):
         mime = 'application/json'
         content = json.dumps({'version': 3, 'file': 'jquery.min.js',
