@@ -771,6 +771,11 @@ def response(method, path, event, query=''):
         content = ('/* Synthetic decoy stub for wp-mediaelement */\n'
                    'window.wp = window.wp || {};\n'
                    'window.wp.mediaelement = {};\n')
+    elif path == '/wp-includes/js/mediaelement/wp-playlist.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for wp-playlist */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.playlist = {};\n')
     elif path == '/wp-includes/js/mediaelement/mediaelement-migrate.min.js' and method in ('GET', 'HEAD'):
         mime = 'application/javascript'
         content = ('/* Synthetic decoy stub for mediaelement-migrate */\n'
