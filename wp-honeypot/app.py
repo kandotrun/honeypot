@@ -712,6 +712,12 @@ def response(method, path, event, query=''):
                    'window.jQuery = window.jQuery || {};\n'
                    'window.jQuery.ui = window.jQuery.ui || {};\n'
                    'window.jQuery.ui.menu = {};\n')
+    elif path == '/wp-includes/js/jquery/ui/selectmenu.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for jquery-ui-selectmenu */\n'
+                   'window.jQuery = window.jQuery || {};\n'
+                   'window.jQuery.ui = window.jQuery.ui || {};\n'
+                   'window.jQuery.ui.selectmenu = {};\n')
     elif path == '/wp-includes/js/jquery/jquery.min.js.map' and method in ('GET', 'HEAD'):
         mime = 'application/json'
         content = json.dumps({'version': 3, 'file': 'jquery.min.js',
