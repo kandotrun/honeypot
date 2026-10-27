@@ -617,6 +617,11 @@ def response(method, path, event, query=''):
         mime = 'application/javascript'
         content = ('/* Synthetic decoy stub for jquery-migrate */\n'
                    'window.jQueryMigrate = {};\n')
+    elif path == '/wp-includes/js/jquery/ui/core.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for jquery-ui-core */\n'
+                   'window.jQuery = window.jQuery || {};\n'
+                   'window.jQuery.ui = {};\n')
     elif path == '/wp-includes/js/jquery/jquery.min.js.map' and method in ('GET', 'HEAD'):
         mime = 'application/json'
         content = json.dumps({'version': 3, 'file': 'jquery.min.js',
