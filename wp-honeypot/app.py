@@ -555,6 +555,11 @@ def response(method, path, event, query=''):
         content = ('/* Synthetic decoy stub for updates */\n'
                    'window.wp = window.wp || {};\n'
                    'window.wp.updates = {};\n')
+    elif path == '/wp-admin/js/postbox.min.js' and method in ('GET', 'HEAD'):
+        mime = 'application/javascript'
+        content = ('/* Synthetic decoy stub for postbox */\n'
+                   'window.wp = window.wp || {};\n'
+                   'window.wp.postbox = {};\n')
     elif method == 'OPTIONS' and path == '/':
         status, headers['Allow'], content = 200, 'GET, POST, OPTIONS, HEAD', ''
     elif method == 'TRACE' and path == '/':
